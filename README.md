@@ -227,3 +227,6 @@ Implementing them in order (1 → 2 → 3 → 4) gives you incremental progress 
 | `say` (macOS) | Per-agent TTS voices — Alex for Edgeworth, Zoe for Sparks |
 | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Speech-to-text for voice feedback mode |
 | [sounddevice](https://python-sounddevice.readthedocs.io) + [webrtcvad](https://github.com/wiseman/py-webrtcvad) | Microphone recording with voice activity detection |
+
+Extra personal note: Use Audio Move OBS plugin or Scale To Sound OBS plugin for AIs speaking.
+Edgeworth with phoenix wright music. Also Light Yagami with the Death Note music.

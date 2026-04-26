@@ -38,21 +38,21 @@ def build_context_package(
     # so the agent can see the full picture, not just one file.
     # We label each file with === markers so the agent knows where one ends and the next begins.
     #
-    # codebase_str = "\n\n".join(
-    #     f"=== {fname} ===\n{contents}"       # f-string: label + file contents
-    #     for fname, contents in codebase.items()  # iterate every file in the workspace
-    # )
+    codebase_str = "\n\n".join(
+        f"=== {fname} ===\n{contents}" # f-string: label + file contents
+        for fname, contents in codebase.items() # iterate every file in the workspace
+    )
 
     # ── Step 2: Handle the first-round case ──────────────────────────────────
     # On round 1 there is no previous critique yet — previous_critique will be None.
     # We need to handle that gracefully so the agent knows this is a clean slate.
     # A clear instruction is better than sending the word "None" to the model.
     #
-    # critique_section = (
-    #     previous_critique                              # use the real critique if it exists
-    #     if previous_critique                           # truthiness check: None or "" both fall through
-    #     else "None — this is round 1. Write your first implementation."  # clear first-round prompt
-    # )
+    critique_selection = (
+        previous_critique # use the real critque if it exists
+        if previous_critique # Truthiness check: None or "" both fall through
+        else "None - this is round 1. Write your first implementation."
+    )
 
     # ── Step 3: Assemble the full context string ──────────────────────────────
     # This is the single string passed as a "user" message in the agent's
@@ -62,12 +62,10 @@ def build_context_package(
     # That mirrors how a human developer would think: "what do I need to build,
     # what's already there, and what's wrong with it?"
     #
-    # return (
-    #     f"FEATURE REQUEST:\n{feature_request}\n\n"         # the original goal — never changes
-    #     f"CURRENT CODEBASE:\n{codebase_str}\n\n"           # what's in the workspace right now
-    #     f"PREVIOUS AGENT'S CRITIQUE:\n{critique_section}\n\n"  # what the other agent complained about
-    #     f"ROUND: {round_num}\n"                            # lets the agent know how far along we are
-    #     f"YOUR TURN: {agent_name}"                         # explicit instruction on who is acting
-    # )
-
-    pass
+    return (
+        f"FEATURE REQUEST:\n{feature_request}\n\n"              # the original goal - never changes
+        f"CURRENT CODEBASE:\n{codebase_str}\n\n"                # what's in the workspace right now
+        f"PREVIOUS AGENT'S CRITIQUE:\n{critique_selection}\n\n" # what the other agent complained about
+        f"ROUND: {round_num}\n"                                 # lets the agent know how far along we are
+        f"YOUR TURN: {agent_name}"                              # explcitit instruction on who is acting
+    )
