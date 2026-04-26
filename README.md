@@ -15,18 +15,18 @@ You speak or type a feature request
 ┌─────────────────────────────────────────────────────────────┐
 │                      TURN LOOP (N rounds)                   │
 │                                                             │
-│   ┌─────────────┐   reads workspace   ┌─────────────────┐  │
-│   │  EDGEWORTH  │ ◄────────────────── │   workspace/    │  │
-│   │  (precise,  │                     │   solution.py   │  │
-│   │  cold)      │ ──── writes code ──►│                 │  │
-│   └──────┬──────┘                     │   (git repo)    │  │
-│          │ critique                   │                 │  │
-│          ▼                            │                 │  │
-│   ┌─────────────┐   reads workspace   │                 │  │
-│   │   SPARKS    │ ◄────────────────── │                 │  │
-│   │  (chaotic,  │                     │                 │  │
-│   │  defensive) │ ──── rewrites ─────►│                 │  │
-│   └──────┬──────┘                     └─────────────────┘  │
+│   ┌─────────────┐   reads workspace   ┌─────────────────┐   │
+│   │  EDGEWORTH  │ ◄────────────────── │   workspace/    │   │
+│   │  (precise,  │                     │   solution.py   │   │
+│   │  cold)      │ ──── writes code ──►│                 │   │
+│   └──────┬──────┘                     │   (git repo)    │   │
+│          │ critique                   │                 │   │
+│          ▼                            │                 │   │
+│   ┌─────────────┐   reads workspace   │                 │   │
+│   │   SPARKS    │ ◄────────────────── │                 │   │
+│   │  (chaotic,  │                     │                 │   │
+│   │  defensive) │ ──── rewrites ─────►│                 │   │
+│   └──────┬──────┘                     └─────────────────┘   │
 │          │ critique                          │              │
 │          └──────────────── repeat ◄──────────┘              │
 └─────────────────────────────────────────────────────────────┘

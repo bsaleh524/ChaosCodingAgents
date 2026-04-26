@@ -1,5 +1,5 @@
 """
-Turn orchestrator — manages the Edgeworth ↔ Sparks loop, git commits, and terminal output.
+Turn orchestrator — manages the Edgeworth ↔ Sparks loop and terminal output.
 
 PLACEHOLDER MODE  → _run_placeholder_loop() — fully implemented, no LLM needed.
 REAL MODE         → _run_real_loop()         — TODO: implement the turn logic.
@@ -20,7 +20,7 @@ from config import (
 from agents import edgeworth_turn, intern_summary, sparks_turn
 from context_builder import build_context_package
 from context_trimmer import trim_conversation_history
-from git_manager import GitManager
+from workspace_manager import WorkspaceManager
 
 
 # ── Terminal formatting helpers ───────────────────────────────────────────────
@@ -49,19 +49,6 @@ def _critique_block(agent: str, critique: str) -> None:
         print(f"  {color}│{RESET} {line}")
     print(f"{color}{'┄' * 50}{RESET}\n")
 
-def _diff_block(diff: str) -> None:
-    if not diff.strip():
-        return
-    print(f"{DIM}{'·' * 50}{RESET}")
-    for line in diff.splitlines():
-        if line.startswith("+") and not line.startswith("+++"):
-            print(f"\033[32m{line}{RESET}")
-        elif line.startswith("-") and not line.startswith("---"):
-            print(f"\033[31m{line}{RESET}")
-        else:
-            print(f"{DIM}{line}{RESET}")
-    print(f"{DIM}{'·' * 50}{RESET}\n")
-
 def _check_interrupt(stop_event: threading.Event) -> bool:
     return stop_event.is_set()
 
@@ -80,7 +67,7 @@ class Orchestrator:
         self.rounds = rounds
         self.use_voice = use_voice
 
-        self.git = GitManager(workspace_dir)
+        self.ws = WorkspaceManager(workspace_dir)
 
         # Conversation histories — each agent maintains its own thread
         self.edgeworth_history: list[dict] = []
@@ -106,7 +93,7 @@ class Orchestrator:
         _banner("[ INTERN ACTIVATED ]", BOLD + RED)
         print(f"{RED}Oh god oh god you're back —{RESET}\n")
         time.sleep(0.4)
-        codebase = self.git.read_workspace()
+        codebase = self.ws.read_workspace()
         summary = intern_summary(self.feature_request, codebase, self.use_voice)
         print(summary)
         print()
@@ -130,12 +117,8 @@ class Orchestrator:
                 use_voice=self.use_voice,
             )
 
-            self.git.write_solution(code, SOLUTION_FILE)
-            self.git.commit(f"[Edgeworth] Round {round_num}")
-            diff = self.git.diff_last()
-
+            self.ws.write_solution(code, SOLUTION_FILE)
             _critique_block("EDGEWORTH", critique)
-            _diff_block(diff)
             self.last_critique = critique
 
             if _check_interrupt(self.stop_event):
@@ -152,17 +135,12 @@ class Orchestrator:
                 use_voice=self.use_voice,
             )
 
-            self.git.write_solution(code, SOLUTION_FILE)
-            self.git.commit(f"[Sparks] Round {round_num}")
-            diff = self.git.diff_last()
-
+            self.ws.write_solution(code, SOLUTION_FILE)
             _critique_block("SPARKS", critique)
-            _diff_block(diff)
             self.last_critique = critique
             self.rounds_completed = round_num
 
         _banner(f"Loop complete — {self.rounds_completed} round(s) done.", DIM)
-        print(f"{DIM}Git log:\n{self.git.log_oneline()}{RESET}\n")
 
     # ── Real loop — TODO ──────────────────────────────────────────────────────
 
@@ -192,7 +170,7 @@ class Orchestrator:
 
         #     # Step 2: Read workspace — agents always see the LATEST files, not a cached copy.
         #     # This is what makes the loop stateful: each agent reads what the other just wrote.
-        #     codebase = self.git.read_workspace()              # {filename: contents} of workspace/
+        #     codebase = self.ws.read_workspace()               # {filename: contents} of session folder
 
         #     # Step 3: Build the context package — this is TODO #1.
         #     # Without it the agent only sees an empty string and can't coordinate.
@@ -205,7 +183,7 @@ class Orchestrator:
         #     )
 
         #     # Step 4: Trim history before calling the agent — this is TODO #3.
-        #     # or-fallback keeps the untrimmed history if trim returns None (i.e. not yet implemented).
+        #     # or-fallback keeps the untrimmed history if trim returns None (not yet implemented).
         #     self.edgeworth_history = (                        # replace history with trimmed version
         #         trim_conversation_history(                    # trims to stay under MAX_CONTEXT_TOKENS
         #             self.edgeworth_history,
@@ -220,15 +198,12 @@ class Orchestrator:
         #         pkg, self.edgeworth_history, round_num, self.use_voice
         #     )
 
-        #     # Step 6: Write code to disk + commit so the git history captures each rewrite.
-        #     # This is what makes the whole thing inspectable after the fact.
-        #     self.git.write_solution(code, SOLUTION_FILE)      # overwrites workspace/solution.py
-        #     self.git.commit(f"[Edgeworth] Round {round_num}") # git commit with a labelled message
-        #     diff = self.git.diff_last()                       # unified diff vs. previous commit
+        #     # Step 6: Write code to the session folder.
+        #     # Each agent overwrites solution.py with their latest version.
+        #     self.ws.write_solution(code, SOLUTION_FILE)       # writes to workspace/<session>/solution.py
 
-        #     # Step 7: Print output + store critique for the next agent's context package.
+        #     # Step 7: Print critique + store it for the next agent's context package.
         #     _critique_block("EDGEWORTH", critique)            # prints the critique in a styled block
-        #     _diff_block(diff)                                 # prints the git diff with color
         #     self.last_critique = critique                     # stored so Sparks receives it next turn
 
         #     if _check_interrupt(self.stop_event):             # check again mid-round
@@ -242,7 +217,7 @@ class Orchestrator:
         #     #   - calls sparks_turn() instead of edgeworth_turn()
         #     _label("SPARKS", f"Round {round_num} — counter-rewriting...")
 
-        #     codebase = self.git.read_workspace()              # re-read: Sparks sees Edgeworth's latest code
+        #     codebase = self.ws.read_workspace()               # re-read: Sparks sees Edgeworth's latest code
         #     pkg = build_context_package(
         #         feature_request=self.feature_request,
         #         codebase=codebase,
@@ -258,17 +233,13 @@ class Orchestrator:
         #     code, critique = sparks_turn(
         #         pkg, self.sparks_history, round_num, self.use_voice
         #     )
-        #     self.git.write_solution(code, SOLUTION_FILE)
-        #     self.git.commit(f"[Sparks] Round {round_num}")
-        #     diff = self.git.diff_last()
+        #     self.ws.write_solution(code, SOLUTION_FILE)       # Sparks overwrites with her version
 
         #     _critique_block("SPARKS", critique)
-        #     _diff_block(diff)
         #     self.last_critique = critique                     # stored so Edgeworth receives it next round
         #     self.rounds_completed = round_num                 # track progress for the Intern summary
 
         # _banner(f"Loop complete — {self.rounds_completed} round(s) done.", DIM)
-        # print(f"{DIM}Git log:\n{self.git.log_oneline()}{RESET}\n")
 
         print(f"{RED}[REAL MODE] _run_real_loop() is not yet implemented.{RESET}")
         print(f"  → Implement this method in orchestrator.py")
