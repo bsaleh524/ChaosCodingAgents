@@ -120,12 +120,13 @@ def route_feedback_to_agents(
     # That choice — synchronous vs. independent — changes the dynamic significantly.
     #
     # Uncomment the solution below when you're ready:
+    """
 
     # ── Step 1: Import the personality prompts ────────────────────────────────
     # Each agent needs its own system prompt so it stays in character.
     # These live in agents.py alongside the rest of the agent definitions.
     #
-    # from agents import EDGEWORTH_SYSTEM, SPARKS_SYSTEM  # import both personality prompts
+    from agents import EDGEWORTH_SYSTEM, SPARKS_SYSTEM  #import both personality prompts
 
     # ── Step 2: Call Edgeworth with his history + the feedback ───────────────
     # _real_feedback_response() is already implemented above — it handles the
@@ -133,15 +134,15 @@ def route_feedback_to_agents(
     # We pass Edgeworth's OWN history (not Sparks') so their context threads stay separate.
     # other_agent_response lets Edgeworth react to what Sparks said last round, if anything.
     #
-    # e_reply = _real_feedback_response(
-    #     agent_name="EDGEWORTH",                                      # used to label the "other" agent in the prompt
-    #     system_prompt=EDGEWORTH_SYSTEM,                              # Edgeworth's personality
-    #     history=edgeworth_history,                                   # Edgeworth's own conversation thread
-    #     feedback_text=feedback_text,                                 # what Basem just said
-    #     other_agent_response=(                                       # what Sparks said last round (or None)
-    #         previous_responses.get("sparks") if previous_responses else None
-    #     ),
-    # )
+    e_reply = _real_feedback_response(
+        agent_name="EDGEWORTH",                         # used to label the "other" agent in the prompt
+        system_prompt=EDGEWORTH_SYSTEM,                 # Edgeworth's personality
+        history=edgeworth_history,                      # Edgeworth's own conversation thread
+        feedback_text=feedback_text,                    # what Basem just said
+        other_agent_response=(                          # what Sparks said last round
+            previous_responses.get("sparks") if previous_responses else None
+        )
+    )
 
     # ── Step 3: Call Sparks with her history + the feedback ──────────────────
     # Exact same pattern as Edgeworth but with Sparks' system prompt and history.
@@ -149,25 +150,23 @@ def route_feedback_to_agents(
     # Both agents are called independently, so neither waits on the other.
     # This is the "fan-out": one input triggers two separate, parallel agent calls.
     #
-    # s_reply = _real_feedback_response(
-    #     agent_name="SPARKS",                                         # used to label the "other" agent in the prompt
-    #     system_prompt=SPARKS_SYSTEM,                                 # Sparks' personality
-    #     history=sparks_history,                                      # Sparks' own conversation thread
-    #     feedback_text=feedback_text,                                 # same feedback Basem gave
-    #     other_agent_response=(                                       # what Edgeworth said last round (or None)
-    #         previous_responses.get("edgeworth") if previous_responses else None
-    #     ),
-    # )
+    s_reply = _real_feedback_response(
+        agent_name="SPARKS",                            # used to label the "other" agent in the prompt
+        system_prompt=SPARKS_SYSTEM,                    # Sparks' personality
+        history=sparks_history,                         # Sparks' own conversation thread
+        feedback_text=feedback_text,                    # same feedback Basem gave
+        other_agent_response=(                          # what Edgeworth said last round (or None)
+            previous_responses.get("edgeworth") if previous_responses else None
+        )
+    )
 
     # ── Step 4: Return both replies ───────────────────────────────────────────
     # The caller (run_feedback_mode) prints and speaks both replies in order.
     # Histories were already updated inside _real_feedback_response, so future
     # calls to either agent will include this exchange automatically.
     #
+    return e_reply, s_reply
     # return e_reply, s_reply
-
-    pass
-
 
 # ── Feedback mode UI ──────────────────────────────────────────────────────────
 

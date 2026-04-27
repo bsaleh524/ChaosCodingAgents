@@ -45,14 +45,14 @@ def trim_conversation_history(
     # Token estimation: dividing character count by 4 is a widely-used rough rule
     # (GPT/Claude tokenizers average ~4 chars per token in English code).
     #
-    # def estimate_tokens(msgs: list[dict]) -> int:
-    #     return sum(len(m["content"]) // 4 for m in msgs)  # sum token estimates across all messages
-    #
-    # if not history:                          # empty history — nothing to trim
-    #     return history
-    #
-    # if estimate_tokens(history) <= max_tokens:   # already under budget — return as-is
-    #     return history
+    def estimate_tokens(msgs: list[dict]) -> int:
+        return sum(len(m["content"]) // 4 for m in msgs)    # sum token estimates across all messages
+
+    if not history:                             # empty history -- nothing to trim
+        return history
+    
+    if estimate_tokens(history) <= max_tokens:      # already under budget - return as-is
+        return history
 
     # ── Step 2: Identify which messages to always keep ───────────────────────
     # We anchor on two ends of the history:
@@ -62,19 +62,16 @@ def trim_conversation_history(
     #                    Losing these means the agent loses immediate context.
     # Everything between them is the "droppable middle".
     #
-    # first = history[:1]                      # always keep the very first message
-    # tail  = history[-4:] if len(history) > 5 else history[1:]  # last 2 exchanges, skip first to avoid dupe
+    first = history[:1]                                         # keep the very first message
+    tail = history[-4:] if len(history) > 5 else history[1:]    # last 2 exchanges, skip first to avoid dupe
 
     # ── Step 3: Build the trimmed list and re-check ───────────────────────────
     # Combine anchor + tail, dropping the middle entirely.
     # If that's still too long (rare — means even 2 exchanges are huge),
     # fall back to just the tail so we at least have recent context.
     #
-    # trimmed = first + tail                   # anchor + recent exchanges, middle dropped
-    #
-    # if estimate_tokens(trimmed) > max_tokens:    # still too big (very large exchanges)
-    #     trimmed = tail                           # last resort: drop even the first message
-    #
-    # return trimmed
-
-    pass
+    trimmed = first + tail                      # anchor + recent exchanges, middle dropped
+    if estimate_tokens(trimmed) > max_tokens:       # still too big (large exchanges)
+        trimmed = tail                              #last reseot: drop even the first message
+    
+    return trimmed
