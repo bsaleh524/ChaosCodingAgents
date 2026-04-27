@@ -9,7 +9,8 @@ Toggle via PLACEHOLDER_MODE in config.py.
 
 import re
 import textwrap
-from config import MODEL_AGENTS, MODEL_INTERN, PLACEHOLDER_MODE
+import config
+from config import MODEL_AGENTS, MODEL_INTERN
 from voice import say_as
 
 # ── Lazy Anthropic client (only instantiated in real mode) ────────────────────
@@ -407,7 +408,7 @@ def edgeworth_turn(
     In placeholder mode: uses canned responses.
     In real mode: calls the Anthropic API.
     """
-    if PLACEHOLDER_MODE:
+    if config.PLACEHOLDER_MODE:
         code, critique = _placeholder_edgeworth(round_num)
         say_as("EDGEWORTH", critique, enabled=use_voice)
         return code, critique
@@ -427,7 +428,7 @@ def sparks_turn(
     In placeholder mode: uses canned responses.
     In real mode: calls the Anthropic API.
     """
-    if PLACEHOLDER_MODE:
+    if config.PLACEHOLDER_MODE:
         code, critique = _placeholder_sparks(round_num)
         say_as("SPARKS", critique, enabled=use_voice)
         return code, critique
@@ -446,7 +447,7 @@ def intern_summary(
     In placeholder mode: uses canned response.
     In real mode: calls claude-haiku.
     """
-    if PLACEHOLDER_MODE:
+    if config.PLACEHOLDER_MODE:
         text = _placeholder_intern(feature_request, codebase)
         say_as("INTERN", text, enabled=use_voice)
         return text

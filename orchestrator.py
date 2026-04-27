@@ -9,10 +9,10 @@ import threading
 import time
 from pathlib import Path
 
+import config
 from config import (
     MAX_CONTEXT_TOKENS,
     NUM_ROUNDS,
-    PLACEHOLDER_MODE,
     SOLUTION_FILE,
     USE_VOICE,
     WORKSPACE_DIR,
@@ -81,10 +81,10 @@ class Orchestrator:
     # ── Public entry points ───────────────────────────────────────────────────
 
     def run(self) -> None:
-        _banner(f"CHAOS CODING AGENTS  |  {self.rounds} round(s)  |  {'PLACEHOLDER' if PLACEHOLDER_MODE else 'LLM'} mode", BOLD + GREEN)
+        _banner(f"CHAOS CODING AGENTS  |  {self.rounds} round(s)  |  {'PLACEHOLDER' if config.PLACEHOLDER_MODE else 'LLM'} mode", BOLD + GREEN)
         print(f"  Feature request: {self.feature_request}\n")
 
-        if PLACEHOLDER_MODE:
+        if config.PLACEHOLDER_MODE:
             self._run_placeholder_loop()
         else:
             self._run_real_loop()
