@@ -160,54 +160,54 @@ class Orchestrator:
         # range(1, self.rounds + 1) gives us 1-indexed round numbers for display.
         # We check stop_event at the top so an interrupt is caught before each round.
         #
-        # for round_num in range(1, self.rounds + 1):           # count from 1 for human-readable output
-        #     if _check_interrupt(self.stop_event):             # user pressed Enter — bail out early
-        #         print(f"\n{RED}[SYSTEM] Interrupted at round {round_num}.{RESET}")
-        #         break
+        for round_num in range(1, self.rounds + 1):                   # count from 1 for human readability
+            if _check_interrupt(self.stop_event):                       # user pressed enter -- bail out
+                print(f"\n{RED}[SYSTEM] Interrupted at round {round_num}.{RESET}")
+                break
 
         #     # ── Edgeworth turn ─────────────────────────────────────────────
-        #     _label("EDGEWORTH", f"Round {round_num} — rewriting...")
+            _label("EDGEWORTH", f"Round {round_num} — rewriting...")
 
         #     # Step 2: Read workspace — agents always see the LATEST files, not a cached copy.
         #     # This is what makes the loop stateful: each agent reads what the other just wrote.
-        #     codebase = self.ws.read_workspace()               # {filename: contents} of session folder
+            codebase = self.ws.read_workspace()         # {filename: contents} of session folder
 
         #     # Step 3: Build the context package — this is TODO #1.
         #     # Without it the agent only sees an empty string and can't coordinate.
-        #     pkg = build_context_package(                      # formats the user message for the LLM
-        #         feature_request=self.feature_request,         # the original goal — never changes
-        #         codebase=codebase,                            # what's currently in the workspace
-        #         previous_critique=self.last_critique,         # what Sparks said last (or None on round 1)
-        #         agent_name="EDGEWORTH",                       # tells the agent who it is
-        #         round_num=round_num,                          # tells the agent how far along we are
-        #     )
+            pkg = build_context_package(                        # formats user message for the LLM
+                feature_request=self.feature_request,           # the original goal -- never changes
+                codebase=codebase,                              # what's currently in the workspace
+                previous_critique=self.last_critique,           # what Sparks said last (or None on round 1)
+                agent_name="EDGEWORTH",                         # tells the agent who it is
+                round_num=round_num                             # tells the agent how far along we are
+            )
 
         #     # Step 4: Trim history before calling the agent — this is TODO #3.
         #     # or-fallback keeps the untrimmed history if trim returns None (not yet implemented).
-        #     self.edgeworth_history = (                        # replace history with trimmed version
-        #         trim_conversation_history(                    # trims to stay under MAX_CONTEXT_TOKENS
-        #             self.edgeworth_history,
-        #             MAX_CONTEXT_TOKENS,
-        #             self.feature_request,
-        #         ) or self.edgeworth_history                   # fallback: keep original if trimmer returns None
-        #     )
+            self.edgeworth_history = (                             # replace history with trimmed version
+                trim_conversation_history(                   # trims to stay under MAX_CONTEXT_TOKENS
+                    self.edgeworth_history,
+                    MAX_CONTEXT_TOKENS,
+                    self.feature_request,
+                ) or self.edgeworth_history                     # fallback: keep original if trimmer returns None
+            )
 
         #     # Step 5: Call the agent — returns (code_string, critique_string).
         #     # The history list is mutated in-place inside edgeworth_turn (appends user + assistant messages).
-        #     code, critique = edgeworth_turn(                  # LLM call — returns parsed <code> and <critique>
-        #         pkg, self.edgeworth_history, round_num, self.use_voice
-        #     )
+            code, critique = edgeworth_turn(
+                pkg, self.edgeworth_history, round_num, self.use_voice # LLM call — returns parsed <code> and <critique>
+            )
 
         #     # Step 6: Write code to the session folder.
         #     # Each agent overwrites solution.py with their latest version.
-        #     self.ws.write_solution(code, SOLUTION_FILE)       # writes to workspace/<session>/solution.py
+            self.ws.write_solution(code, SOLUTION_FILE)         # writes to workspace/<session>/solution.py
 
         #     # Step 7: Print critique + store it for the next agent's context package.
-        #     _critique_block("EDGEWORTH", critique)            # prints the critique in a styled block
-        #     self.last_critique = critique                     # stored so Sparks receives it next turn
+            _critique_block("EDGEWORTH", critique)              # prints the critique in a styled block
+            self.last_critique = critique                       # stored so Sparks receives it next turn
 
-        #     if _check_interrupt(self.stop_event):             # check again mid-round
-        #         break
+            if _check_interrupt(self.stop_event):               # check again mid-round
+                break
 
         #     # ── Sparks turn ────────────────────────────────────────────────
         #     # Exact same pattern as Edgeworth above, but:
@@ -215,31 +215,32 @@ class Orchestrator:
         #     #   - passes "SPARKS" as agent_name
         #     #   - uses sparks_history (separate thread from edgeworth_history)
         #     #   - calls sparks_turn() instead of edgeworth_turn()
-        #     _label("SPARKS", f"Round {round_num} — counter-rewriting...")
+            _label("SPARKS", f"Round {round_num} - counter-rewriting...")
 
-        #     codebase = self.ws.read_workspace()               # re-read: Sparks sees Edgeworth's latest code
-        #     pkg = build_context_package(
-        #         feature_request=self.feature_request,
-        #         codebase=codebase,
-        #         previous_critique=self.last_critique,         # Edgeworth's critique from just above
-        #         agent_name="SPARKS",
-        #         round_num=round_num,
-        #     )
-        #     self.sparks_history = (
-        #         trim_conversation_history(
-        #             self.sparks_history, MAX_CONTEXT_TOKENS, self.feature_request
-        #         ) or self.sparks_history
-        #     )
-        #     code, critique = sparks_turn(
-        #         pkg, self.sparks_history, round_num, self.use_voice
-        #     )
-        #     self.ws.write_solution(code, SOLUTION_FILE)       # Sparks overwrites with her version
+            codebase = self.ws.read_workspace()                 # re-read: Sparks sees Edgeworth's latest code
+            pkg = build_context_package(
+                feature_request=self.feature_request,
+                codebase=codebase,
+                previous_critique=self.last_critique,           # Edgeworth's last saved critique
+                agent_name="SPARKS",
+                round_num=round_num,
+            )
+            self.sparks_history = (
+                trim_conversation_history(
+                    self.sparks_history, MAX_CONTEXT_TOKENS, self.feature_request
+                ) or self.sparks_history
+            )
 
-        #     _critique_block("SPARKS", critique)
-        #     self.last_critique = critique                     # stored so Edgeworth receives it next round
-        #     self.rounds_completed = round_num                 # track progress for the Intern summary
+            code, critique = sparks_turn(
+                pkg, self.sparks_history, round_num, self.use_voice
+            )
+            self.ws.write_solution(code, SOLUTION_FILE)         # Sparks overwrites with her version
 
-        # _banner(f"Loop complete — {self.rounds_completed} round(s) done.", DIM)
+            _critique_block("SPARKS", critique)
+            self.last_critique = critique                       # stored so Edgeworth receives it next round
+            self.rounds_completed = round_num                   # tracks progress for the Intern summary.
+
+        _banner(f"Loop complete - {self.rounds_completed} rounds(s) done.", DIM)
 
         print(f"{RED}[REAL MODE] _run_real_loop() is not yet implemented.{RESET}")
         print(f"  → Implement this method in orchestrator.py")
