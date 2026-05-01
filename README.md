@@ -230,3 +230,6 @@ Implementing them in order (1 → 2 → 3 → 4) gives you incremental progress 
 
 Extra personal note: Use Audio Move OBS plugin or Scale To Sound OBS plugin for AIs speaking.
 Edgeworth with phoenix wright music. Also Light Yagami with the Death Note music.
+
+# edgeworth: Mac is Jamie(Premium) or EL: Micheal C Vincement
+# Light yagamia: Mac is  Tim(Enhanced) or Edward (loud, confident, cocky)
