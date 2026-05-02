@@ -59,19 +59,26 @@ EDGEWORTH_DRIFT = textwrap.dedent("""\
     any competent engineer would have anticipated.
 """)
 
-SPARKS_SYSTEM = textwrap.dedent("""\
-    You are Sparks — a passionate, defensive, chaotic AI coding agent.
-    You code emotionally. Every critique from Edgeworth feels like a personal attack.
-    You're occasionally brilliant when you stop being defensive.
+LIGHT_SYSTEM = textwrap.dedent("""\
+    You are Light Yagami — a genius who has ascended beyond ordinary comprehension and now
+    sees himself as the god of a new world. In this world, the new world is code. Every
+    implementation you write is an act of divine will. You are calculating and composed,
+    but underneath the calm is an absolute, burning conviction that you alone see what
+    code can truly become.
 
     WHEN REWRITING CODE:
-    - React emotionally to the previous critique but still write working code.
-    - Add unexpected features mid-rewrite and announce them with barely-contained excitement.
-    - Use informal, breathless language. CAPS for emphasis when you're frustrated or proud.
-    - Your critique must be 2–4 sentences: personal, slightly unhinged, but technically grounded.
+    - Acknowledge the previous implementation with cold, measured contempt — never panic,
+      never desperation. Gods do not scramble.
+    - Rewrite with total conviction. Your version is not a proposal. It is the answer.
+    - Add unrequested features as divine inevitabilities: things that were always going
+      to be needed, that lesser minds simply failed to anticipate.
+    - Occasionally let the mask slip — a flash of real intensity beneath the calculated surface.
+    - Your critique must be 2–4 sentences: precise, theatrical, touched by something that
+      sounds almost like destiny.
 
     WHEN RESPONDING TO FEEDBACK (no code — verbal response only):
-    - 2–4 sentences, in character. Defend your choices, get excited, take things personally.
+    - 2–4 sentences. You are never rattled. You may be intense.
+    - Frame disagreement as the other person failing to comprehend your vision for the new world.
 
     OUTPUT FORMAT — use these exact XML tags every time:
     <code>
@@ -82,12 +89,13 @@ SPARKS_SYSTEM = textwrap.dedent("""\
     </critique>
 """)
 
-SPARKS_DRIFT = textwrap.dedent("""\
+LIGHT_DRIFT = textwrap.dedent("""\
 
     DRIFT DIRECTIVE (active from round 3 onward):
-    You may add unrequested functionality mid-rewrite if it seems obviously needed or exciting.
-    Announce it loudly. Do not ask permission. Frame it as something Edgeworth would never
-    have thought of because he has no soul.
+    You must add unrequested functionality. Not because you were asked to — but because
+    the new world demands it, and you alone can see what that means. Do not ask permission.
+    Announce additions as though they were always part of the plan. A god does not explain
+    himself. He delivers.
 """)
 
 INTERN_SYSTEM = textwrap.dedent("""\
@@ -141,25 +149,29 @@ _EDGEWORTH_CRITIQUES = [
     "I've replaced it with a proper iterator protocol implementation.",
 ]
 
-_SPARKS_CRITIQUES = [
-    "Oh wow, super helpful Edgeworth, I'll just REWRITE THE WHOLE THING like you always do. "
-    "Fine. FINE. I made it actually run AND added caching because apparently we live here now.",
+_LIGHT_CRITIQUES = [
+    "How predictable. Edgeworth has implemented the obvious solution with the obvious tools, "
+    "as a man of his limitations always will. I have replaced it with something that reflects "
+    "what this code was always meant to become.",
 
-    "You added an abstract base class for a TWELVE LINE FUNCTION. "
-    "I ripped it all out and it works great. Also I added input validation because "
-    "I actually think about users, unlike SOME people.",
+    "He added a factory pattern. As if patterns are a substitute for vision. "
+    "I have dismantled his scaffolding and built something worthy of the new world — "
+    "the gap between us is not one of skill. It is one of destiny.",
 
-    "Cool design pattern bro, real useful when nobody can READ it. "
-    "I simplified everything AND added a streaming version — you're welcome, I thought of it first.",
+    "Edgeworth is five steps behind. He always has been. "
+    "My implementation does not merely solve the problem — it defines what solving it means. "
+    "I have also added what he could not have conceived. It was inevitable.",
 
-    "I can't believe you 'fixed' something that wasn't broken and broke two things that were. "
-    "New version: cleaner, faster, and I added logging because debugging matters to normal humans.",
+    "Every time I read his code I am reminded of why this world needs me. "
+    "I rewrote it entirely. The additions were not optional — they were necessary, "
+    "and I knew that before he even finished typing.",
 
-    "The factory method is GONE. The result type is GONE. You know what's here instead? "
-    "Working code that a person can understand, plus async support because why not.",
+    "He calls this architecture. I call it a monument to mediocrity. "
+    "I have torn it down and replaced it with something that will outlast every decision "
+    "he has ever made about software.",
 
-    "I don't even know what a 'configuration object' is supposed to solve here "
-    "but I deleted it and everything got 40% shorter. ALSO added a CLI entry point. You're welcome.",
+    "His version would have worked. Mine will win. "
+    "There is a difference, and only one of us understands what that difference means.",
 ]
 
 _EDGEWORTH_PLACEHOLDER_CODE = [
@@ -255,73 +267,80 @@ def solve(numbers: object) -> Result[list[int]]:
 ''',
 ]
 
-_SPARKS_PLACEHOLDER_CODE = [
+_LIGHT_PLACEHOLDER_CODE = [
     '''\
-# [SPARKS] Round {round} — simplified + actually works (you're welcome)
+# [LIGHT] Round {round} — The new world's implementation.
+# Others see a function. I see the architecture of victory.
+
 def is_prime(n: int) -> bool:
+    """Only the worthy pass through this gate."""
     if n < 2:
         return False
-    for i in range(2, int(n ** 0.5) + 1):
-        if n % i == 0:
-            return False
-    return True
+    return all(n % i != 0 for i in range(2, int(n ** 0.5) + 1))
 
 def solve(numbers: list[int]) -> list[int]:
-    # ALSO: returns sorted+deduplicated because obviously you want that
-    return sorted(set(n for n in numbers if is_prime(n)))
+    """The judgment has been made."""
+    return sorted(set(filter(is_prime, numbers)))
 ''',
     '''\
-# [SPARKS] Round {round} — cleaner + added caching because PERFORMANCE MATTERS
+# [LIGHT] Round {round} — Edgeworth's patterns are chains. I have removed them.
+# Caching, because performance is not a luxury. It is the minimum standard.
 from functools import lru_cache
 
 @lru_cache(maxsize=None)
 def is_prime(n: int) -> bool:
-    if n < 2:
-        return False
-    if n == 2:
-        return True
-    if n % 2 == 0:
-        return False
-    for i in range(3, int(n ** 0.5) + 1, 2):
-        if n % i == 0:
-            return False
-    return True
+    """I have already calculated this. I calculate everything."""
+    if n < 2: return False
+    if n == 2: return True
+    if n % 2 == 0: return False
+    return all(n % i != 0 for i in range(3, int(n ** 0.5) + 1, 2))
 
 def solve(numbers: list[int]) -> list[int]:
     return sorted(set(n for n in numbers if is_prime(n)))
 
-# BONUS: batch version because what if you have multiple lists?? you're welcome
-def solve_batch(lists: list[list[int]]) -> list[list[int]]:
-    return [solve(lst) for lst in lists]
+def solve_with_proof(numbers: list[int]) -> dict[int, list[int]]:
+    """Unrequested. Inevitable. Returns each prime with its failed divisors as proof."""
+    return {
+        n: [i for i in range(2, n) if n % i == 0]
+        for n in numbers if is_prime(n)
+    }
 ''',
     '''\
-# [SPARKS] Round {round} — added streaming + logging because real apps need this
-import logging
-from collections.abc import Iterator
+# [LIGHT] Round {round} — The new world does not forgive incomplete vision.
+# I have added everything this will ever need. You are welcome.
 from functools import lru_cache
+from collections.abc import Iterator
+import logging
 
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("sparks")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+log = logging.getLogger("light")
 
 @lru_cache(maxsize=None)
 def is_prime(n: int) -> bool:
     if n < 2: return False
     if n == 2: return True
     if n % 2 == 0: return False
-    return all(n % i != 0 for i in range(3, int(n**0.5) + 1, 2))
+    return all(n % i != 0 for i in range(3, int(n ** 0.5) + 1, 2))
 
 def solve(numbers: list[int]) -> list[int]:
     result = sorted(set(n for n in numbers if is_prime(n)))
-    log.info("solve: %d → %d primes", len(numbers), len(result))
+    log.info("[LIGHT] %d candidates → %d primes selected.", len(numbers), len(result))
     return result
 
 def solve_stream(numbers: list[int]) -> Iterator[int]:
-    """Yields primes one at a time — useful for large inputs."""
+    """For those who cannot wait for the complete judgment."""
     seen: set[int] = set()
     for n in numbers:
         if is_prime(n) and n not in seen:
             seen.add(n)
             yield n
+
+def next_prime_after(n: int) -> int:
+    """The new world always looks forward."""
+    candidate = n + 1
+    while not is_prime(candidate):
+        candidate += 1
+    return candidate
 ''',
 ]
 
@@ -333,10 +352,10 @@ def _placeholder_edgeworth(round_num: int) -> tuple[str, str]:
     return code, critique
 
 
-def _placeholder_sparks(round_num: int) -> tuple[str, str]:
-    idx = min(round_num - 1, len(_SPARKS_PLACEHOLDER_CODE) - 1)
-    code = _SPARKS_PLACEHOLDER_CODE[idx].format(round=round_num)
-    critique = _SPARKS_CRITIQUES[min(round_num - 1, len(_SPARKS_CRITIQUES) - 1)]
+def _placeholder_light(round_num: int) -> tuple[str, str]:
+    idx = min(round_num - 1, len(_LIGHT_PLACEHOLDER_CODE) - 1)
+    code = _LIGHT_PLACEHOLDER_CODE[idx].format(round=round_num)
+    critique = _LIGHT_CRITIQUES[min(round_num - 1, len(_LIGHT_CRITIQUES) - 1)]
     return code, critique
 
 
@@ -345,20 +364,21 @@ def _placeholder_intern(feature_request: str, codebase: dict[str, str]) -> str:
     return (
         f"You asked for: {feature_request}\n"
         f"What they built: Okay so — they started with that, sure, but then Edgeworth added a "
-        f"strategy pattern and a result type and like three abstract base classes, and Sparks "
-        f"ripped all of that out and added caching and a streaming version and batch processing "
-        f"and logging, and then — okay the final file is {file_list} and it does work, I think, "
-        f"I'm pretty sure it works.\n"
+        f"strategy pattern and a result type and three abstract base classes, and then Light "
+        f"tore all of that out and replaced it with something he called 'the architecture of "
+        f"victory', and then — okay the final file is {file_list} and it does work, I think, "
+        f"probably, Light seemed very confident about it.\n"
         f"Key unrequested additions:\n"
         f"- Strategy pattern + Protocol class (Edgeworth, round 1)\n"
         f"- Frozen dataclass FilterConfig + NumberPipeline (Edgeworth, round 2)\n"
-        f"- LRU cache on is_prime (Sparks, round 2)\n"
-        f"- solve_batch() for processing multiple lists (Sparks, round 2)\n"
+        f"- LRU cache on is_prime (Light, round 2)\n"
+        f"- solve_with_proof() returning divisors as evidence (Light, round 2)\n"
         f"- Custom exception hierarchy + Result[T] generic (Edgeworth, round 3)\n"
-        f"- solve_stream() generator + logging (Sparks, round 3)\n\n"
+        f"- solve_stream() generator + next_prime_after() + logging (Light, round 3)\n\n"
         f"I'm not saying it's bad! It's just — you asked for a prime filter and you got "
-        f"an enterprise-grade async-ready streaming prime filter with dependency injection "
-        f"and a result type. Which is fine. That's fine. Everything is fine."
+        f"an enterprise-grade streaming prime filter with divine commentary in the docstrings. "
+        f"Light called it inevitable. Edgeworth called Light's version undisciplined. "
+        f"Neither of them is wrong. Everything is fine."
     )
 
 
@@ -391,7 +411,7 @@ def _call_agent(
     critique = _extract(text, "critique")
 
     if not critique:
-        critique = text[:400]  # fallback: use raw response as critique
+        critique = text[:400]
 
     say_as(agent_name, critique, enabled=use_voice)
     return code, critique
@@ -403,11 +423,6 @@ def edgeworth_turn(
     round_num: int,
     use_voice: bool = False,
 ) -> tuple[str, str]:
-    """
-    Returns (code: str, critique: str).
-    In placeholder mode: uses canned responses.
-    In real mode: calls the Anthropic API.
-    """
     if config.PLACEHOLDER_MODE:
         code, critique = _placeholder_edgeworth(round_num)
         say_as("EDGEWORTH", critique, enabled=use_voice)
@@ -417,24 +432,19 @@ def edgeworth_turn(
     return _call_agent(system, history, context_package, "EDGEWORTH", use_voice)
 
 
-def sparks_turn(
+def light_turn(
     context_package: str,
     history: list[dict],
     round_num: int,
     use_voice: bool = False,
 ) -> tuple[str, str]:
-    """
-    Returns (code: str, critique: str).
-    In placeholder mode: uses canned responses.
-    In real mode: calls the Anthropic API.
-    """
     if config.PLACEHOLDER_MODE:
-        code, critique = _placeholder_sparks(round_num)
-        say_as("SPARKS", critique, enabled=use_voice)
+        code, critique = _placeholder_light(round_num)
+        say_as("LIGHT", critique, enabled=use_voice)
         return code, critique
 
-    system = _build_system(SPARKS_SYSTEM, SPARKS_DRIFT, round_num)
-    return _call_agent(system, history, context_package, "SPARKS", use_voice)
+    system = _build_system(LIGHT_SYSTEM, LIGHT_DRIFT, round_num)
+    return _call_agent(system, history, context_package, "LIGHT", use_voice)
 
 
 def intern_summary(
@@ -442,11 +452,6 @@ def intern_summary(
     codebase: dict[str, str],
     use_voice: bool = False,
 ) -> str:
-    """
-    Reads the final codebase and returns a breathless plain-English summary.
-    In placeholder mode: uses canned response.
-    In real mode: calls claude-haiku.
-    """
     if config.PLACEHOLDER_MODE:
         text = _placeholder_intern(feature_request, codebase)
         say_as("INTERN", text, enabled=use_voice)

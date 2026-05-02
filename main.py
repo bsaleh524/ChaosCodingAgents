@@ -4,7 +4,8 @@ Chaos Coding Agents — entry point.
 Usage:
     python main.py
     python main.py --rounds 4 --voice
-    python main.py --no-placeholder       # enables real LLM calls
+    python main.py --elevenlabs
+    python main.py --no-placeholder --rounds 3
 """
 
 import argparse
@@ -21,8 +22,12 @@ from feedback import run_feedback_mode
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Chaos Coding Agents")
-    p.add_argument("--rounds", type=int, default=NUM_ROUNDS, help="Number of rounds (default %(default)s)")
-    p.add_argument("--voice",  action="store_true", default=USE_VOICE, help="Enable Mac TTS via `say`")
+    p.add_argument("--rounds", type=int, default=NUM_ROUNDS,
+                   help="Number of rounds (default %(default)s)")
+    p.add_argument("--voice", action="store_true", default=USE_VOICE,
+                   help="Enable voice output via Mac `say`")
+    p.add_argument("--elevenlabs", action="store_true", default=False,
+                   help="Use ElevenLabs TTS instead of Mac `say` (requires ELEVENLABS_API_KEY)")
     p.add_argument("--no-placeholder", dest="no_placeholder", action="store_true",
                    help="Disable placeholder mode — use real Anthropic LLM calls")
     return p.parse_args()
@@ -45,7 +50,7 @@ def print_header() -> None:
     print("\033[1m\033[92m")
     print("╔══════════════════════════════════════════════════════════╗")
     print("║            C H A O S   C O D I N G   A G E N T S        ║")
-    print("║      Edgeworth  ×  Sparks  ×  The Intern                ║")
+    print("║        Edgeworth  ×  Light Yagami  ×  The Intern        ║")
     print("╚══════════════════════════════════════════════════════════╝")
     print("\033[0m")
 
@@ -53,15 +58,22 @@ def print_header() -> None:
 def main() -> None:
     args = parse_args()
 
-    # Apply CLI overrides to config
+    # Apply CLI overrides to config (must use config.X so all modules see the change)
     if args.no_placeholder:
         config.PLACEHOLDER_MODE = False
-    if args.voice:
+    if args.voice or args.elevenlabs:
         config.USE_VOICE = True
+    if args.elevenlabs:
+        config.USE_ELEVENLABS = True
+        if not config.ELEVENLABS_API_KEY:
+            print("\033[91m[ERROR] --elevenlabs requires ELEVENLABS_API_KEY to be set.\033[0m")
+            print("  export ELEVENLABS_API_KEY=your_key_here")
+            sys.exit(1)
 
     print_header()
 
-    feature_request = _get_feature_request(args.voice or config.USE_VOICE)
+    use_voice = args.voice or args.elevenlabs or config.USE_VOICE
+    feature_request = _get_feature_request(use_voice)
     if not feature_request:
         print("No feature request provided. Exiting.")
         sys.exit(1)
@@ -74,7 +86,7 @@ def main() -> None:
     orchestrator = Orchestrator(
         feature_request=feature_request,
         rounds=args.rounds,
-        use_voice=args.voice or config.USE_VOICE,
+        use_voice=use_voice,
         workspace_dir=session_dir,
     )
 
@@ -97,28 +109,19 @@ def main() -> None:
     # ── Feedback mode ─────────────────────────────────────────────────────────
     run_feedback_mode(
         edgeworth_history=orchestrator.edgeworth_history,
-        sparks_history=orchestrator.sparks_history,
-        use_voice=args.voice or config.USE_VOICE,
+        light_history=orchestrator.light_history,
+        use_voice=use_voice,
     )
 
 
 def _wait_for_enter_or_finish(thread: threading.Thread, orchestrator: Orchestrator) -> bool:
-    """
-    Blocks until either:
-      (a) the loop thread finishes naturally → returns False
-      (b) user presses Enter              → returns True (interrupted)
-    Uses a short poll so we notice thread completion without blocking stdin permanently.
-    """
     import select
-
     while thread.is_alive():
-        # Check stdin for Enter with a 0.2 s timeout
         rlist, _, _ = select.select([sys.stdin], [], [], 0.2)
         if rlist:
-            sys.stdin.readline()  # consume the newline
+            sys.stdin.readline()
             return True
-
-    return False  # finished naturally
+    return False
 
 
 if __name__ == "__main__":
