@@ -30,6 +30,8 @@ def parse_args() -> argparse.Namespace:
                    help="Use ElevenLabs TTS instead of Mac `say` (requires ELEVENLABS_API_KEY)")
     p.add_argument("--no-placeholder", dest="no_placeholder", action="store_true",
                    help="Disable placeholder mode — use real Anthropic LLM calls")
+    p.add_argument("--sync", action="store_true", default=False,
+                   help="Run loop in main thread (no interrupt support) — easier to debug")
     return p.parse_args()
 
 
@@ -90,18 +92,23 @@ def main() -> None:
         workspace_dir=session_dir,
     )
 
-    # ── Run the turn loop in a thread so Enter interrupts it ──────────────────
-    print("\n  \033[2mPress Enter at any time to interrupt and summon the Intern early.\033[0m\n")
+    if args.sync:
+        # Synchronous mode — runs in main thread, fully debuggable, no interrupt support
+        print("\n  \033[2m[SYNC MODE] Running in main thread. Breakpoints work normally.\033[0m\n")
+        orchestrator.run()
+    else:
+        # ── Run the turn loop in a thread so Enter interrupts it ──────────────
+        print("\n  \033[2mPress Enter at any time to interrupt and summon the Intern early.\033[0m\n")
 
-    loop_thread = threading.Thread(target=orchestrator.run, daemon=True)
-    loop_thread.start()
+        loop_thread = threading.Thread(target=orchestrator.run, daemon=True)
+        loop_thread.start()
 
-    interrupted = _wait_for_enter_or_finish(loop_thread, orchestrator)
+        interrupted = _wait_for_enter_or_finish(loop_thread, orchestrator)
 
-    if interrupted:
-        orchestrator.stop_event.set()
-        loop_thread.join(timeout=3)
-        print("\n\033[91m[SYSTEM] Interrupted — summoning the Intern.\033[0m")
+        if interrupted:
+            orchestrator.stop_event.set()
+            loop_thread.join(timeout=3)
+            print("\n\033[91m[SYSTEM] Interrupted — summoning the Intern.\033[0m")
 
     # ── Intern summary ────────────────────────────────────────────────────────
     orchestrator.summon_intern()

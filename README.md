@@ -233,3 +233,4 @@ Edgeworth with phoenix wright music. Also Light Yagami with the Death Note music
 
 # edgeworth: Mac is Jamie(Premium) or EL: Micheal C Vincement
 # Light yagamia: Mac is  Tim(Enhanced) or Edward (loud, confident, cocky)
+# "I want a drawn banana in ascii. When I run the file, it merely prints it to the console."
