@@ -15,8 +15,8 @@ ELEVENLABS_VOICES = {
 
 # Mac `say` voice fallbacks
 SAY_VOICES = {
-    "EDGEWORTH": "Alex",
-    "LIGHT":     "Daniel",
+    "EDGEWORTH": "Jamie",
+    "LIGHT":     "Tim",
     "INTERN":    "Samantha",
 }
 
