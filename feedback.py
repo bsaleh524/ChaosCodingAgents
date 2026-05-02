@@ -112,51 +112,48 @@ def route_feedback_to_agents(
     # That choice — synchronous vs. independent — changes the dynamic significantly.
     #
     # Uncomment the solution below when you're ready:
-
+    """
     # ── Step 1: Import the personality prompts ────────────────────────────────
     # Each agent needs its own system prompt so it stays in character.
     # These live in agents.py alongside the rest of the agent definitions.
     #
-    # from agents import EDGEWORTH_SYSTEM, LIGHT_SYSTEM  # import both personality prompts
+    from agents import EDGEWORTH_SYSTEM, LIGHT_SYSTEM  # import both personality prompts
 
     # ── Step 2: Call Edgeworth with his history + the feedback ───────────────
     # _real_feedback_response() handles the API call, appends to history, returns reply text.
     # We pass Edgeworth's OWN history so their context threads stay separate.
     # other_agent_response lets Edgeworth react to what Light said last round, if anything.
     #
-    # e_reply = _real_feedback_response(
-    #     agent_name="EDGEWORTH",
-    #     system_prompt=EDGEWORTH_SYSTEM,
-    #     history=edgeworth_history,
-    #     feedback_text=feedback_text,
-    #     other_agent_response=(
-    #         previous_responses.get("light") if previous_responses else None
-    #     ),
-    # )
+    e_reply = _real_feedback_response(
+        agent_name="EDGEWORTH",
+        system_prompt=EDGEWORTH_SYSTEM,
+        history=edgeworth_history,
+        feedback_text=feedback_text,
+        other_agent_response=(
+            previous_responses.get("light") if previous_responses else None
+        ),
+    )
 
     # ── Step 3: Call Light with his history + the feedback ───────────────────
     # Exact same pattern but with Light's system prompt and history.
     # Light sees what Edgeworth said last round — not what he just said.
     # This is the fan-out: one input → two separate, independent agent calls.
     #
-    # l_reply = _real_feedback_response(
-    #     agent_name="LIGHT",
-    #     system_prompt=LIGHT_SYSTEM,
-    #     history=light_history,
-    #     feedback_text=feedback_text,
-    #     other_agent_response=(
-    #         previous_responses.get("edgeworth") if previous_responses else None
-    #     ),
-    # )
+    l_reply = _real_feedback_response(
+        agent_name="LIGHT",
+        system_prompt=LIGHT_SYSTEM,
+        history=light_history,
+        feedback_text=feedback_text,
+        other_agent_response=(
+            previous_responses.get("edgeworth") if previous_responses else None
+        ),
+    )
 
     # ── Step 4: Return both replies ───────────────────────────────────────────
     # Histories were already updated inside _real_feedback_response, so future
     # calls to either agent will include this exchange automatically.
     #
-    # return e_reply, l_reply
-    """
-    pass
-
+    return e_reply, l_reply
 
 # ── Feedback mode UI ──────────────────────────────────────────────────────────
 
