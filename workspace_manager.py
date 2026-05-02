@@ -16,6 +16,8 @@ class WorkspaceManager:
             )
 
     def write_solution(self, code: str, filename: str = "solution.py") -> None:
+        if not code.strip():
+            return  # never wipe the file with an empty parse result
         (self.path / filename).write_text(code)
 
     def read_workspace(self) -> dict[str, str]:

@@ -124,6 +124,30 @@ def _extract(text: str, tag: str) -> str:
     m = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
     return m.group(1).strip() if m else ""
 
+def _extract_code(text: str) -> str:
+    """Try <code> tags first, fall back to markdown fences."""
+    result = _extract(text, "code")
+    if result:
+        return result
+    m = re.search(r"```(?:python)?\n?(.*?)```", text, re.DOTALL)
+    return m.group(1).strip() if m else ""
+
+def _extract_critique(text: str) -> str:
+    """Try <critique> tags first, fall back to text after </code>."""
+    result = _extract(text, "critique")
+    if result:
+        return result
+    # Grab whatever comes after the closing code tag — that's the critique
+    m = re.search(r"</code>(.*?)$", text, re.DOTALL)
+    if m:
+        candidate = m.group(1).strip()
+        if candidate:
+            return candidate
+    # Last resort: strip out any code blocks and use what's left
+    stripped = re.sub(r"<code>.*?</code>", "", text, flags=re.DOTALL)
+    stripped = re.sub(r"```.*?```", "", stripped, flags=re.DOTALL)
+    return stripped.strip()[:400]
+
 
 # ── Placeholder implementations ───────────────────────────────────────────────
 
@@ -407,11 +431,11 @@ def _call_agent(
     text = resp.content[0].text
     history.append({"role": "assistant", "content": text})
 
-    code = _extract(text, "code")
-    critique = _extract(text, "critique")
+    code = _extract_code(text)
+    critique = _extract_critique(text)
 
-    if not critique:
-        critique = text[:400]
+    if not code:
+        print(f"\n  \033[91m[PARSE WARNING] {agent_name} response had no extractable code — workspace unchanged.\033[0m")
 
     say_as(agent_name, critique, enabled=use_voice)
     return code, critique
