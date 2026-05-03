@@ -13,6 +13,8 @@ import config
 from config import MODEL_AGENTS, MODEL_INTERN
 from voice import say_as
 
+MAX_TOKENS=8192
+
 # ── Lazy Anthropic client (only instantiated in real mode) ────────────────────
 _client = None
 
@@ -424,7 +426,7 @@ def _call_agent(
     history.append({"role": "user", "content": context_package})
     resp = client.messages.create(
         model=MODEL_AGENTS,
-        max_tokens=2048,
+        max_tokens=MAX_TOKENS,
         system=system,
         messages=history,
     )
@@ -491,7 +493,7 @@ def intern_summary(
     )
     resp = client.messages.create(
         model=MODEL_INTERN,
-        max_tokens=1024,
+        max_tokens=MAX_TOKENS,
         system=[{"type": "text", "text": INTERN_SYSTEM, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": user_msg}],
     )

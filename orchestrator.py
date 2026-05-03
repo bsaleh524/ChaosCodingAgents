@@ -5,7 +5,6 @@ PLACEHOLDER MODE  → _run_placeholder_loop() — fully implemented, no LLM need
 REAL MODE         → _run_real_loop()         — TODO: implement the turn logic.
 """
 
-import threading
 import time
 from pathlib import Path
 
@@ -50,9 +49,6 @@ def _critique_block(agent: str, critique: str) -> None:
         print(f"  {color}│{RESET} {line}")
     print(f"{color}{'┄' * 50}{RESET}\n")
 
-def _check_interrupt(stop_event: threading.Event) -> bool:
-    return stop_event.is_set()
-
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
 
@@ -77,7 +73,6 @@ class Orchestrator:
         # Shared state written by the loop, read by Intern and Feedback mode
         self.last_critique: str | None = None
         self.rounds_completed: int = 0
-        self.stop_event = threading.Event()
 
     # ── Public entry points ───────────────────────────────────────────────────
 
@@ -103,10 +98,6 @@ class Orchestrator:
 
     def _run_placeholder_loop(self) -> None:
         for round_num in range(1, self.rounds + 1):
-            if _check_interrupt(self.stop_event):
-                print(f"\n{RED}[SYSTEM] Interrupted at round {round_num}.{RESET}")
-                break
-
             # ── Edgeworth turn ────────────────────────────────────────────────
             _label("EDGEWORTH", f"Round {round_num} — rewriting...")
             time.sleep(0.6)
@@ -121,9 +112,6 @@ class Orchestrator:
             self.ws.write_solution(code, SOLUTION_FILE)
             _critique_block("EDGEWORTH", critique)
             self.last_critique = critique
-
-            if _check_interrupt(self.stop_event):
-                break
 
             # ── Light turn ────────────────────────────────────────────────────
             _label("LIGHT", f"Round {round_num} — rewriting...")
@@ -159,12 +147,8 @@ class Orchestrator:
         # ── Step 1: Outer loop — iterate over N rounds ────────────────────────
         # Each round = one Edgeworth turn + one Light turn.
         # range(1, self.rounds + 1) gives us 1-indexed round numbers for display.
-        # We check stop_event at the top so an interrupt is caught before each round.
         #
         for round_num in range(1, self.rounds + 1):           # count from 1 for human-readable output
-            if _check_interrupt(self.stop_event):             # user pressed Enter — bail out early
-                print(f"\n{RED}[SYSTEM] Interrupted at round {round_num}.{RESET}")
-                break
 
         #     # ── Edgeworth turn ─────────────────────────────────────────────
             _label("EDGEWORTH", f"Round {round_num} — rewriting...")
@@ -205,9 +189,6 @@ class Orchestrator:
         #     # Step 7: Print critique + store it for the next agent's context package.
             _critique_block("EDGEWORTH", critique)            # prints the critique in a styled block
             self.last_critique = critique                     # stored so Light receives it next turn
-
-            if _check_interrupt(self.stop_event):             # check again mid-round
-                break
 
         #     # ── Light turn ──────────────────────────────────────────────────
         #     # Exact same pattern as Edgeworth above, but:
