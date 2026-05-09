@@ -12,3 +12,4 @@ dependencies:
   - pip:
       - webrtcvad>=2.0.10       # no conda-forge build
       - faster-whisper>=1.0.0   # no conda-forge build
+      - obs-websocket-py==1.0 # OBS WebSocket integration

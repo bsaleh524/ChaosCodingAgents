@@ -52,6 +52,26 @@ def _say_elevenlabs(text: str, voice_id: str, api_key: str) -> None:
     Path(tmp_path).unlink(missing_ok=True)
 
 
+# ── OBS helpers ───────────────────────────────────────────────────────────────
+
+def _obs_show(name: str) -> None:
+    if not config.USE_OBS:
+        return
+    from obs_manager import get_obs_manager
+    obs = get_obs_manager()
+    if obs:
+        obs.show_agent(name)
+
+
+def _obs_hide(name: str) -> None:
+    if not config.USE_OBS:
+        return
+    from obs_manager import get_obs_manager
+    obs = get_obs_manager()
+    if obs:
+        obs.hide_agent(name)
+
+
 # ── Text-to-speech dispatcher ─────────────────────────────────────────────────
 
 def say_as(agent_name: str, text: str, enabled: bool = False) -> None:
@@ -59,26 +79,31 @@ def say_as(agent_name: str, text: str, enabled: bool = False) -> None:
     Speak `text` as `agent_name`.
     Priority: ElevenLabs (if USE_ELEVENLABS + key set) → Mac `say` → silent.
     `enabled` must be True for any audio to play.
+    OBS source for this agent is shown before audio and hidden after (via finally).
     """
     if not enabled:
         return
 
     name = agent_name.upper()
+    _obs_show(name)
 
-    # ── ElevenLabs path ───────────────────────────────────────────────────────
-    if config.USE_ELEVENLABS and config.ELEVENLABS_API_KEY:
-        voice_id = ELEVENLABS_VOICES.get(name)
-        if voice_id:
-            _say_elevenlabs(text, voice_id, config.ELEVENLABS_API_KEY)
+    try:
+        # ── ElevenLabs path ───────────────────────────────────────────────────
+        if config.USE_ELEVENLABS and config.ELEVENLABS_API_KEY:
+            voice_id = ELEVENLABS_VOICES.get(name)
+            if voice_id:
+                _say_elevenlabs(text, voice_id, config.ELEVENLABS_API_KEY)
+                return
+            # Agent has no ElevenLabs voice (e.g. Intern) — fall through to say
+
+        # ── Mac say fallback ──────────────────────────────────────────────────
+        if sys.platform != "darwin":
             return
-        # Agent has no ElevenLabs voice (e.g. Intern) — fall through to say
-
-    # ── Mac say fallback ──────────────────────────────────────────────────────
-    if sys.platform != "darwin":
-        return
-    voice = SAY_VOICES.get(name, "Alex")
-    clean = text.replace('"', "'").replace("\n", " ")
-    subprocess.run(["say", "-v", voice, clean], check=False)
+        voice = SAY_VOICES.get(name, "Alex")
+        clean = text.replace('"', "'").replace("\n", " ")
+        subprocess.run(["say", "-v", voice, clean], check=False)
+    finally:
+        _obs_hide(name)
 
 
 def say(text: str, enabled: bool = False) -> None:

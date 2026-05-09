@@ -29,6 +29,8 @@ def parse_args() -> argparse.Namespace:
                    help="Use ElevenLabs TTS instead of Mac `say` (requires ELEVENLABS_API_KEY)")
     p.add_argument("--no-placeholder", dest="no_placeholder", action="store_true",
                    help="Disable placeholder mode — use real Anthropic LLM calls")
+    p.add_argument("--obs", action="store_true", default=False,
+                   help="Show agent OBS sources while they speak (requires OBS WebSocket server)")
     return p.parse_args()
 
 
@@ -68,6 +70,10 @@ def main() -> None:
             print("\033[91m[ERROR] --elevenlabs requires ELEVENLABS_API_KEY to be set.\033[0m")
             print("  export ELEVENLABS_API_KEY=your_key_here")
             sys.exit(1)
+    if args.obs:
+        config.USE_OBS = True
+        from obs_manager import init_obs_manager
+        init_obs_manager()
 
     print_header()
 
