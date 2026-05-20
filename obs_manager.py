@@ -5,6 +5,7 @@ Requires: pip install obs-websocket-py==1.0.1
 OBS: Tools → WebSocket Server Settings → Enable, note port + password.
 """
 
+import socket
 import config
 
 try:
@@ -22,7 +23,7 @@ _obs_manager: "OBSManager | None" = None
 
 class OBSManager:
     def __init__(self) -> None:
-        self._ws = obsws(config.OBS_HOST, config.OBS_PORT, config.OBS_PASSWORD)
+        self._ws = obsws(config.OBS_HOST, config.OBS_PORT, config.OBS_PASSWORD, timeout=5)
         self._ws.connect()
         print(f"  [OBS] Connected to {config.OBS_HOST}:{config.OBS_PORT}")
 
@@ -47,11 +48,24 @@ class OBSManager:
             self.set_source_visibility(config.OBS_SCENE, source, False)
 
 
+def _port_open(host: str, port: int, timeout: float = 3.0) -> bool:
+    """TCP probe — returns False immediately if nothing is listening."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def init_obs_manager() -> "OBSManager | None":
     global _obs_manager, _AGENT_SOURCES
 
     if not _LIB_AVAILABLE:
         print("  [OBS] obs-websocket-py not installed. Run: pip install obs-websocket-py==1.0.1")
+        return None
+
+    if not _port_open(config.OBS_HOST, config.OBS_PORT):
+        print(f"  [OBS] Nothing listening on {config.OBS_HOST}:{config.OBS_PORT} — is OBS open with WebSocket server enabled?")
         return None
 
     _AGENT_SOURCES = {
@@ -63,7 +77,7 @@ def init_obs_manager() -> "OBSManager | None":
     try:
         _obs_manager = OBSManager()
     except Exception as e:
-        print(f"  [OBS] Could not connect — is OBS open with WebSocket server enabled? ({e})")
+        print(f"  [OBS] WebSocket handshake failed ({e})")
         _obs_manager = None
 
     return _obs_manager

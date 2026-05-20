@@ -27,10 +27,10 @@ LIGHT_VOICE_ID        = "SOYHLrjzK2X1ezoPC6cr"
 
 # ── OBS WebSockets ────────────────────────────────────────────────────────────
 USE_OBS              = False
-OBS_HOST             = "192.168.1.212" #localhost
+OBS_HOST             = "172.20.4.124" #localhost
 OBS_PORT             = 4455
 OBS_PASSWORD         = os.environ.get("OBS_WS_PASSWORD", "")
 OBS_SCENE            = "Default"   # match your OBS scene name exactly
 EDGEWORTH_OBS_SOURCE = "Edgeworth"              # OBS source name for Edgeworth image
 LIGHT_OBS_SOURCE     = "Light"           # OBS source name for Light image
-INTERN_OBS_SOURCE    = "Intern"                 # OBS source name for Intern image
+INTERN_OBS_SOURCE    = "Anxiety"                 # OBS source name for Intern image

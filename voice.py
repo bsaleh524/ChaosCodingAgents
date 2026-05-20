@@ -3,6 +3,7 @@
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 import config
@@ -113,7 +114,42 @@ def say(text: str, enabled: bool = False) -> None:
     subprocess.run(["say", clean], check=False)
 
 
-# ── Microphone recording + VAD ────────────────────────────────────────────────
+# ── Microphone recording ──────────────────────────────────────────────────────
+
+def record_until_keypress(
+    sample_rate: int = 16_000,
+    max_duration_s: float = 120.0,
+) -> bytes:
+    """Record from mic until the user presses Enter (or max_duration_s elapses)."""
+    try:
+        import sounddevice as sd
+    except ImportError:
+        raise RuntimeError(
+            "Voice recording requires: pip install sounddevice numpy"
+        )
+
+    frames: list[bytes] = []
+    stop_event = threading.Event()
+    frame_samples = int(sample_rate * 0.03)  # 30 ms chunks
+    max_frames = int(max_duration_s / 0.03)
+
+    def _record() -> None:
+        with sd.RawInputStream(samplerate=sample_rate, channels=1, dtype="int16") as stream:
+            for _ in range(max_frames):
+                if stop_event.is_set():
+                    break
+                raw, _ = stream.read(frame_samples)
+                frames.append(bytes(raw))
+
+    record_thread = threading.Thread(target=_record, daemon=True)
+    record_thread.start()
+    print("  [MIC] Recording... Press Enter to stop.")
+    input()
+    stop_event.set()
+    record_thread.join(timeout=2)
+
+    return b"".join(frames)
+
 
 def record_until_silence(
     sample_rate: int = 16_000,
@@ -187,10 +223,10 @@ def _write_wav(path: str, audio_f32, sample_rate: int) -> None:
 
 def listen() -> str:
     try:
-        pcm = record_until_silence()
+        pcm = record_until_keypress()
         text = transcribe(pcm)
         print(f"  [TRANSCRIBED] {text}")
         return text
     except RuntimeError as e:
         print(f"  [VOICE UNAVAILABLE] {e}")
-        return input("  Type feedback instead: ").strip()
+        return input("  Type instead: ").strip()
