@@ -12,6 +12,7 @@ import config
 ELEVENLABS_VOICES = {
     "EDGEWORTH": config.EDGEWORTH_VOICE_ID,
     "LIGHT":     config.LIGHT_VOICE_ID,
+    "INTERN":    config.INTERN_VOICE_ID,
 }
 
 # Mac `say` voice fallbacks
@@ -95,7 +96,6 @@ def say_as(agent_name: str, text: str, enabled: bool = False) -> None:
             if voice_id:
                 _say_elevenlabs(text, voice_id, config.ELEVENLABS_API_KEY)
                 return
-            # Agent has no ElevenLabs voice (e.g. Intern) — fall through to say
 
         # ── Mac say fallback ──────────────────────────────────────────────────
         if sys.platform != "darwin":

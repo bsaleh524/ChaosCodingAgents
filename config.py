@@ -24,6 +24,7 @@ MAX_CONTEXT_TOKENS = 8_000
 ELEVENLABS_API_KEY    = os.environ.get("ELEVENLABS_API_KEY", "")
 EDGEWORTH_VOICE_ID    = "JBFqnCBsd6RMkjVDRZzb"
 LIGHT_VOICE_ID        = "SOYHLrjzK2X1ezoPC6cr"
+INTERN_VOICE_ID       = "mrQhZWGbb2k9qWJb5qeA"
 
 # ── OBS WebSockets ────────────────────────────────────────────────────────────
 USE_OBS              = False
