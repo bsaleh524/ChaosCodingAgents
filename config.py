@@ -28,7 +28,7 @@ INTERN_VOICE_ID       = "mrQhZWGbb2k9qWJb5qeA"
 
 # ── OBS WebSockets ────────────────────────────────────────────────────────────
 USE_OBS              = False
-OBS_HOST             = "172.20.4.124" #localhost
+OBS_HOST             = "192.168.1.212" #localhost
 OBS_PORT             = 4455
 OBS_PASSWORD         = os.environ.get("OBS_WS_PASSWORD", "")
 OBS_SCENE            = "Default"   # match your OBS scene name exactly
