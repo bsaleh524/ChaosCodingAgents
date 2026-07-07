@@ -19,17 +19,62 @@ Start by asking: "Ready to start? Open `langgraph_impl/state.py` — we'll begin
 
 ## Background (share with the user when relevant)
 
-The `ChaosCodingAgents` project is a multi-agent system where:
+### What ChaosCodingAgents is
+
+A multi-agent system where:
 - **Edgeworth** and **Light** take turns rewriting code in a loop
 - Each agent reads what the other just wrote and critiques it
-- The **Intern** summarizes at the end
+- The **Intern** summarizes the chaos at the end
+- An optional **feedback mode** lets the user talk back to both agents after the loop
 
-The original is hand-rolled (raw Anthropic SDK, a custom `Orchestrator` class, manual history lists). The `langgraph_impl/` folder is a LangGraph rewrite of the same system. The user is filling it in to learn LangGraph.
+The original is hand-rolled: raw Anthropic SDK calls, a custom `Orchestrator` class managing the for loop, manual history lists, and a regex parser for output tags. The `langgraph_impl/` folder is a LangGraph rewrite. The user is filling it in to learn LangGraph by doing.
 
-**Reference materials in this repo:**
-- `learn/langchain_langgraph/langchain_langgraph_intro.ipynb` — the companion notebook with working examples for every concept
-- `LANGGRAPH_MIGRATION.md` — the full spec of what each piece replaces
-- `orchestrator.py`, `agents.py`, `context_builder.py` — the original implementation to compare against
+### What the migration covers (and what it doesn't)
+
+Completing all 17 TODOs produces a **fully working LangGraph implementation** of the core loop:
+- State schema replacing `Orchestrator` instance variables ✓
+- Agent nodes replacing `edgeworth_turn()` / `light_turn()` / `intern_summary()` ✓
+- Graph wiring replacing the `for` loop and `summon_intern()` ✓
+- Stream observer replacing `print()` calls inside agent functions ✓
+- OBS portrait switching and voice output via the stream observer ✓
+
+**Not covered by this exercise (future work):**
+- Human-in-the-loop feedback mode replacing `feedback.py` — this uses `interrupt_before` + `update_state`, more advanced LangGraph. A natural follow-up once the core loop is working.
+
+### What NOT to change
+
+These files are reused as-is by the new implementation. Do not modify them:
+
+| File | Why it's unchanged |
+|---|---|
+| `context_builder.py` | Produces a string; `langgraph_impl/nodes.py` wraps it in `HumanMessage`. No LangGraph coupling. |
+| `agents.py` | System prompts (`EDGEWORTH_SYSTEM`, `LIGHT_SYSTEM`, etc.) are imported directly. |
+| `config.py` | Model names, OBS settings, voice flags — all read by the new implementation as-is. |
+| `obs_manager.py` | `init_obs_manager()` is called once at startup; singleton used everywhere via `get_obs_manager()`. |
+| `voice.py` | `say_as()` already owns OBS show/hide internally — no changes needed. |
+
+### How OBS and voice work (relevant to TODO 17)
+
+OBS source switching is **not wired separately** — it's a free side effect of calling `say_as()` in `voice.py`:
+
+```python
+def say_as(agent_name, text, enabled=False):
+    _obs_show(name)       # show portrait BEFORE speaking
+    try:
+        # ElevenLabs or Mac `say` TTS...
+    finally:
+        _obs_hide(name)   # hide portrait AFTER speaking
+```
+
+So calling `say_as()` in the stream observer is all you need. OBS show/hide, TTS, and the `--obs` / `--voice` flags are all handled inside that one call.
+
+**Startup:** `init_obs_manager()` in `langgraph_impl/main.py` is already written — it mirrors the current `main.py` exactly.
+
+### Reference files for comparison
+
+- `orchestrator.py` — the for loop and Orchestrator class being replaced
+- `agents.py` — the agent turn functions being replaced by nodes
+- `learn/langchain_langgraph/langchain_langgraph_intro.ipynb` — working examples of every LangGraph concept used here
 
 ---
 
@@ -56,7 +101,6 @@ The original is hand-rolled (raw Anthropic SDK, a custom `Orchestrator` class, m
 
 **Checkpoint 1** — Verify the state schema:
 ```bash
-cd ChaosCodingAgents
 python -c "from langgraph_impl.state import CCAState; print('State OK:', list(CCAState.__annotations__.keys()))"
 ```
 Should print all 7 field names without errors.
@@ -75,7 +119,7 @@ Should print all 7 field names without errors.
 - **Concept:** An LLM call needs the system prompt + the conversation history + the new message. The system prompt goes first. History is already in `state['edgeworth_history']` as a list of messages. New message goes last.
 - **File:** `langgraph_impl/nodes.py`, `edgeworth_node`
 - **Expected answer:** `[SystemMessage(content=system_text)] + list(state.get('edgeworth_history', [])) + [new_user_msg]`
-- **Checks:** Why do we do `list(state.get(..., []))` instead of just `state['edgeworth_history']`? (Safety for the first round where history is empty.)
+- **Checks:** Why do we do `state.get('edgeworth_history', [])` instead of just `state['edgeworth_history']`? (Safety for the first round where history is empty.)
 
 **TODO 6** — Return the Edgeworth state update
 - **Concept:** Nodes return a PARTIAL dict — only keys that changed. Think about what Edgeworth produces and what the next agent needs.
@@ -90,7 +134,7 @@ Should print all 7 field names without errors.
   ```
 - **Key discussion:** Why return `[new_user_msg, response]` instead of the full history? Because `add_messages` appends — you only return the NEW messages. Why NOT return `'round'`? Because Edgeworth doesn't end the round — that's Light's job.
 
-**TODO 7** — Build Light's message list (same pattern as TODO 4+5)
+**TODO 7** — Build Light's message list (same pattern as TODOs 4 and 5)
 - **File:** `langgraph_impl/nodes.py`, `light_node`
 - Ask them to do it without the hint this time.
 
@@ -145,7 +189,7 @@ python -c "from langgraph_impl.nodes import edgeworth_node, light_node, intern_n
       {'edgeworth': 'edgeworth', 'intern': 'intern'},
   )
   ```
-- **Checks:** Does the dict's keys match the strings `should_continue` returns?
+- **Checks:** Do the dict keys match the strings `should_continue` returns?
 
 **TODO 15** — Connect Intern to END
 - **Expected answer:** `graph.add_edge('intern', END)`
@@ -180,11 +224,12 @@ Should show the correct topology with all nodes and edges.
       'light_history': [],
   }
   ```
-- **Key discussion:** Why does `round` start at 1 and not 0? (Rounds are 1-indexed for human-readable output — and `should_continue` checks `round > max_rounds`, so starting at 0 would mean an extra round.) Why are the history lists empty `[]`? (First round has no prior history.)
+- **Key discussion:** Why does `round` start at 1 and not 0? (`should_continue` checks `round > max_rounds` — starting at 0 would give an extra round.) Why are the history lists `[]`? (No prior history on round 1.)
 
 **TODO 17** — The stream observer
-- **Concept:** `stream()` is the LangGraph version of the for loop body in `orchestrator.py`. Each chunk is `{node_name: state_delta}`. This is where printing, TTS, and OBS source switching all happen — the nodes themselves stay clean.
+- **Concept:** `stream()` replaces the for loop body in `orchestrator.py`. Each chunk is `{node_name: state_delta}`. This is where ALL output lives — terminal printing, TTS, and OBS portrait switching. The nodes themselves stay clean (no print, no audio, no OBS calls).
 - **File:** `langgraph_impl/main.py`, `run()`
+- **OBS note:** You do NOT need to call `show_agent()` / `hide_agent()` here. Calling `say_as()` is enough — it handles OBS internally via `_obs_show()` / `_obs_hide()` in a try/finally. The `--obs` flag and `init_obs_manager()` startup are already handled in `main()`.
 - **Expected answer:**
   ```python
   for chunk in cca_app.stream(initial_state, config=graph_config, stream_mode='updates'):
@@ -199,27 +244,51 @@ Should show the correct topology with all nodes and edges.
       if delta.get('code'):
           print(f'  [{node_name.upper()}] wrote {len(delta["code"])} chars')
   ```
-- **Checks:** Why `list(chunk.keys())[0]`? (Each chunk has exactly one key — the node that just ran.) Why call `say_as()` here instead of inside the node? (Keeps nodes pure. `say_as()` also handles OBS show/hide automatically.)
+- **Checks:** Why `list(chunk.keys())[0]`? (Each chunk has exactly one key — the node that just ran.) Why does `say_as()` here replace the OBS calls that were inside `voice.py`'s helper functions? (OBS is already baked into `say_as()` — centralizing the call here means nodes have zero side effects.)
 
 **Checkpoint 4 (final)** — Run the full implementation:
 ```bash
 mamba activate chaos-agents
 python -m langgraph_impl.main --rounds 2
 ```
-Should prompt for a feature request, run 2 rounds of Edgeworth + Light, then the Intern summary.
+Should prompt for a feature request, run 2 rounds of Edgeworth + Light, then the Intern summary. Add `--voice` or `--obs` to test those paths.
 
 ---
 
 ## When you finish
 
-Compare side by side:
-- `orchestrator.py` `_run_real_loop()` ↔ `langgraph_impl/graph.py` `build_graph()`
-- `orchestrator.py` `__init__` instance variables ↔ `langgraph_impl/state.py` `CCAState`
-- `agents.py` `edgeworth_turn()` ↔ `langgraph_impl/nodes.py` `edgeworth_node()`
-- `main.py` ↔ `langgraph_impl/main.py`
+### Side-by-side comparison
 
-The logic is identical. The difference is what the framework handles for you:
-- State is a TypedDict, not instance variables scattered across a class
-- History accumulation is a reducer, not a list that you remember to append
+| Original | LangGraph equivalent |
+|---|---|
+| `Orchestrator.__init__` instance variables | `langgraph_impl/state.py` `CCAState` |
+| `Orchestrator._run_real_loop()` for loop | `langgraph_impl/graph.py` graph edges |
+| `agents.py` `edgeworth_turn()` | `langgraph_impl/nodes.py` `edgeworth_node` |
+| `agents.py` `light_turn()` | `langgraph_impl/nodes.py` `light_node` |
+| `agents.py` `intern_summary()` + `orchestrator.summon_intern()` | `langgraph_impl/nodes.py` `intern_node` |
+| `main.py` for loop body (print, say_as, write_solution) | `langgraph_impl/main.py` stream observer |
+
+The logic is identical. The difference is what the framework handles:
+- State is a TypedDict, not instance variables on a class
+- History accumulation is a reducer, not a list you manually append to
 - The loop is a graph cycle, not a for loop with a manual termination check
-- The stream observer replaces print() calls buried inside agent functions
+- All output is centralized in the stream observer, not scattered inside agent functions
+
+### What's next (not covered by this exercise)
+
+**Human-in-the-Loop** — replacing `feedback.py`
+
+The original `feedback.py` runs an interactive loop after the Intern where the user can send comments and both agents respond. In LangGraph this is done with `interrupt_before` + `update_state`:
+
+```python
+# Compile with a pause point
+cca_app = graph.compile(
+    checkpointer=checkpointer,
+    interrupt_before=['light'],   # pause before Light runs
+)
+
+# Run until the interrupt, inspect/modify state, then resume
+app.invoke(None, config=config)
+```
+
+This is a natural follow-up once the core loop is working end-to-end.
