@@ -144,6 +144,99 @@ Replace `main.py` CLI + `orchestrator.run()` + `orchestrator.summon_intern()` wi
 
 ---
 
+## Phase 5.5: OBS WebSocket Integration
+
+**Files involved:**
+- `obs_manager.py` — no changes needed
+- `voice.py` — no changes needed
+- `langgraph_impl/main.py` — startup init (same as current `main.py`)
+- `langgraph_impl/main.py` stream observer — where `say_as()` moves (see Phase 7)
+
+### Current architecture (important to understand before migrating)
+
+OBS show/hide is not called directly by agent functions — it is **owned by `say_as()` in `voice.py`**:
+
+```python
+def say_as(agent_name: str, text: str, enabled: bool = False) -> None:
+    _obs_show(name)          # show portrait BEFORE speaking
+    try:
+        # ... ElevenLabs or Mac `say` TTS ...
+    finally:
+        _obs_hide(name)      # hide portrait AFTER speaking (even on error)
+```
+
+`_obs_show()` / `_obs_hide()` call `get_obs_manager()` (the module-level singleton) and toggle the OBS source visibility for that agent's portrait. This means OBS behavior is a free side effect of calling `say_as()` — you don't wire OBS separately.
+
+The startup sequence in the current `main.py`:
+```python
+if args.obs:
+    config.USE_OBS = True
+    from obs_manager import init_obs_manager
+    init_obs_manager()     # TCP probe → WebSocket connect → sets _obs_manager singleton
+```
+
+### What changes in the LangGraph version
+
+**Startup init — no change.** Call `init_obs_manager()` in `langgraph_impl/main.py` before `cca_app.invoke()` or `cca_app.stream()`, same as the current `main.py`. The singleton is then available globally via `get_obs_manager()`.
+
+**Per-turn source switching — depends on where `say_as()` is called.**
+
+The LangGraph version has two options:
+
+#### Option A: Keep `say_as()` as a node side effect (minimal migration work)
+
+Leave `say_as()` calls inside `edgeworth_node` and `light_node`, same as the current `agents.py` pattern. OBS show/hide comes along automatically. No changes to `obs_manager.py` or `voice.py`.
+
+Downside: nodes have side effects, making them harder to test in isolation.
+
+#### Option B: Move `say_as()` to the stream observer (recommended for Phase 7)
+
+In the Phase 7 stream observer in `langgraph_impl/main.py`, call `say_as()` when a node emits a critique. OBS show/hide still comes along automatically — it's baked into `say_as()`.
+
+```python
+from voice import say_as
+
+for chunk in cca_app.stream(initial_state, stream_mode="updates"):
+    node_name = list(chunk.keys())[0]
+    delta = chunk[node_name]
+
+    critique = delta.get("last_critique", "")
+    if critique:
+        # say_as() internally calls _obs_show() → TTS → _obs_hide()
+        say_as(node_name.upper(), critique, enabled=config.USE_VOICE)
+        print(f"\n[{node_name.upper()}] {critique}\n")
+```
+
+This keeps nodes pure (no audio/OBS side effects) and centralizes all output — terminal printing, TTS, and OBS source switching — in one place.
+
+### Config fields (no changes needed)
+
+All OBS config is read from `config.py` by `obs_manager.py` and `voice.py` directly:
+
+| Field | Purpose |
+|---|---|
+| `USE_OBS` | Gate — set to `True` by `--obs` CLI flag |
+| `OBS_HOST` / `OBS_PORT` / `OBS_PASSWORD` | WebSocket connection details |
+| `OBS_SCENE` | OBS scene that contains the agent source items |
+| `EDGEWORTH_OBS_SOURCE` | Name of the Edgeworth portrait source in OBS |
+| `LIGHT_OBS_SOURCE` | Name of the Light portrait source in OBS |
+| `INTERN_OBS_SOURCE` | Name of the Intern portrait source in OBS |
+
+`langgraph_impl/main.py` imports `config` directly — these fields are already available with no changes.
+
+### Graceful degradation (preserve current behavior)
+
+`init_obs_manager()` in `obs_manager.py` already handles all failure cases:
+- `obs-websocket-py` not installed → prints warning, returns `None`
+- OBS not running (TCP probe fails) → prints warning, returns `None`
+- WebSocket handshake fails → prints warning, `_obs_manager` stays `None`
+
+`_obs_show()` / `_obs_hide()` in `voice.py` both guard with `if obs:` — so if `init_obs_manager()` returned `None`, all OBS calls are no-ops. This behavior is preserved for free.
+
+**Done when:** `python langgraph_impl/main.py --obs` shows each agent's portrait in OBS for the duration of their TTS output, matching the original behavior. `python langgraph_impl/main.py` (without `--obs`) runs cleanly with no OBS calls.
+
+---
+
 ## Phase 6: Human-in-the-Loop (replaces `feedback.py`)
 
 **Files to modify:**
@@ -177,13 +270,26 @@ The fan-out behavior from `feedback.py` (both agents responding to feedback inde
 Replace the inline `print()` calls in each agent function with a single `stream()` observer in `main.py`:
 
 ```python
+from voice import say_as
+
 for chunk in cca_app.stream(initial_state, stream_mode="updates"):
     node_name = list(chunk.keys())[0]
     delta = chunk[node_name]
-    # Print critique, code length, round number in a single place
+
+    critique = delta.get("last_critique", "")
+    code = delta.get("code", "")
+
+    if critique:
+        # say_as() internally calls _obs_show() → TTS → _obs_hide()
+        # so OBS portrait switching and voice output both happen here
+        say_as(node_name.upper(), critique, enabled=config.USE_VOICE)
+        _critique_block(node_name.upper(), critique)   # reuse the styled print from orchestrator.py
+
+    if code:
+        print(f"  [{node_name.upper()}] wrote {len(code)} chars")
 ```
 
-This is cosmetic but important for the tutorial — it shows that observability moves from inside agents to the graph boundary.
+This is important for the tutorial — it shows that observability (printing, TTS, OBS) moves from inside individual agent functions to a single boundary in `main.py`. Nodes become pure: they make LLM calls and return state updates, nothing else.
 
 **Done when:** terminal output from the LangGraph version matches the original's visual style (colored banners, critique blocks) but is driven from the `stream()` observer rather than from inside nodes.
 
@@ -194,7 +300,8 @@ This is cosmetic but important for the tutorial — it shows that observability 
 - `context_builder.py` — reuse as-is. It produces a string; wrap it in `HumanMessage`. No framework coupling.
 - `agents.py` system prompts (`EDGEWORTH_SYSTEM`, `LIGHT_SYSTEM`, etc.) — reuse as-is.
 - `config.py` model names and flags — reuse as-is.
-- `voice.py`, `obs_manager.py` — side effects inside nodes; no changes needed.
+- `obs_manager.py` — no changes needed. `init_obs_manager()` is called once at startup; the singleton is used everywhere via `get_obs_manager()`.
+- `voice.py` — no changes needed. `say_as()` already owns OBS show/hide internally via `_obs_show()` / `_obs_hide()`. In Option B (recommended), `say_as()` moves from inside nodes to the stream observer in `main.py` — the file itself is untouched.
 - `workspace_manager.py` — keep as a side effect in `edgeworth_node` / `light_node` if disk writes are desired.
 
 ---
