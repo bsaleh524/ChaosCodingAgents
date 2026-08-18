@@ -6,17 +6,14 @@ The returned dict is a PARTIAL state update — only the keys you include are ch
 Keys you don't return stay at their current values.
 """
 
-import sys
-import os
 import re
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from context_builder import build_context_package
 from agents import EDGEWORTH_SYSTEM, EDGEWORTH_DRIFT, LIGHT_SYSTEM, LIGHT_DRIFT, INTERN_SYSTEM
-from .state import CCAState
+from state import CCAState
 
 AGENT_MODEL = 'claude-sonnet-4-6'
 INTERN_MODEL = 'claude-haiku-4-5-20251001'

@@ -1,109 +1,133 @@
 """
-Chaos Coding Agents — entry point.
+LangGraph entry point — replaces orchestrator.py + main.py.
 
-Usage:
-    python main.py
-    python main.py --rounds 4 --voice
-    python main.py --elevenlabs
-    python main.py --no-placeholder --rounds 3
+The Orchestrator class and its for loop are gone.
+State management, turn routing, and loop termination live in graph.py.
+This file handles: CLI args, startup, initial state, and the stream observer.
 """
 
-import argparse
 import sys
+
+import argparse
 from datetime import datetime
-from pathlib import Path
 
 import config
-from config import NUM_ROUNDS, USE_VOICE, WORKSPACE_DIR
-from orchestrator import Orchestrator
-from feedback import run_feedback_mode
+from terminal_ui import _critique_block, _banner, BOLD, GREEN, DIM
+from voice import say_as
+from workspace_manager import WorkspaceManager
+
+from graph import cca_app
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Chaos Coding Agents")
-    p.add_argument("--rounds", type=int, default=NUM_ROUNDS,
-                   help="Number of rounds (default %(default)s)")
-    p.add_argument("--voice", action="store_true", default=USE_VOICE,
-                   help="Enable voice output via Mac `say`")
-    p.add_argument("--elevenlabs", action="store_true", default=False,
-                   help="Use ElevenLabs TTS instead of Mac `say` (requires ELEVENLABS_API_KEY)")
-    p.add_argument("--no-placeholder", dest="no_placeholder", action="store_true",
-                   help="Disable placeholder mode — use real Anthropic LLM calls")
-    p.add_argument("--obs", action="store_true", default=False,
-                   help="Show agent OBS sources while they speak (requires OBS WebSocket server)")
+    p = argparse.ArgumentParser(description='CCA — LangGraph version')
+    p.add_argument('--rounds', type=int, default=config.NUM_ROUNDS)
+    p.add_argument('--voice', action='store_true', default=config.USE_VOICE)
+    p.add_argument('--elevenlabs', action='store_true', default=False)
+    p.add_argument('--obs', action='store_true', default=False)
     return p.parse_args()
 
 
-def _get_feature_request(use_voice: bool) -> str:
-    print("  Feature request:")
-    if use_voice:
-        print("  \033[2mPress Enter to speak, or just type and press Enter.\033[0m")
-        choice = input("  [Enter = speak | type to skip mic] > ").strip()
-        if choice == "":
-            from voice import listen
-            print()
-            return listen()
-        return choice
-    return input("  > ").strip()
+def _get_feature_request() -> str:
+    print('  Feature request:')
+    return input('  > ').strip()
 
 
-def print_header() -> None:
-    print("\033[1m\033[92m")
-    print("╔══════════════════════════════════════════════════════════╗")
-    print("║            C H A O S   C O D I N G   A G E N T S        ║")
-    print("║        Edgeworth  ×  Light Yagami  ×  The Intern        ║")
-    print("╚══════════════════════════════════════════════════════════╝")
-    print("\033[0m")
+def run(feature_request: str, rounds: int) -> None:
+    session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+    graph_config = {'configurable': {'thread_id': session_id}}
+
+    session_dir = config.WORKSPACE_DIR / session_id
+    ws = WorkspaceManager(session_dir)
+    print(f'\n  \033[2mSession workspace: {session_dir}\033[0m\n')
+
+    # TODO 16 ─────────────────────────────────────────────────────────────────
+    # Build the initial state dict.
+    #
+    # Every field declared in CCAState must be present here.
+    # Open state.py and go through each field.
+    # Ask yourself: what is a sensible starting value for each one?
+    #
+    # Two things to think hard about:
+    #   - What value should `round` start at?
+    #   - What value should the history fields start with? (They're lists.)
+    #
+    initial_state = {
+        'feature_request': feature_request,
+        'max_rounds': rounds,
+        'round': 1,
+        'code': '',
+        'last_critique': None,
+        'intern_summary': None,
+        'edgeworth_history': [],
+        'light_history': [],
+    }
+
+    _banner(f'CHAOS CODING AGENTS  |  LangGraph  |  {rounds} round(s)', BOLD + GREEN)
+    print(f'  Feature request: {feature_request}\n')
+
+    # TODO 17 ─────────────────────────────────────────────────────────────────
+    # Write the stream observer.
+    #
+    # cca_app.stream() yields one chunk per node transition.
+    # Each chunk is a dict: {node_name: state_delta}
+    # state_delta contains only the keys that node returned.
+    #
+    # For each chunk you need to:
+    #   1. Get the node name and state delta out of the chunk
+    #   2. If the delta has a 'last_critique', print it and speak it
+    #      (say_as() handles OBS show/hide automatically)
+    #   3. If the delta has 'code', you can print a brief progress note
+    #
+    # Hint for unpacking: chunk is {node_name: delta}, and there's always
+    # exactly one key per chunk.
+    #
+    for chunk in cca_app.stream(initial_state, config=graph_config, stream_mode='updates'):
+        current_agent_node = list(chunk.keys())[0]
+        delta = chunk[current_agent_node] or {}
+
+        if 'last_critique' in delta:
+            agent_critique = delta['last_critique']
+            _critique_block(current_agent_node.upper(), agent_critique)
+            say_as(
+                agent_name=current_agent_node,
+                text=agent_critique,
+                enabled=config.USE_VOICE
+            )
+        if 'code' in delta:
+            agent_code = delta['code']
+            print(f"  [{current_agent_node.upper()}] wrote {len(agent_code)} chars")
+            ws.write_solution(agent_code, config.SOLUTION_FILE)
+
+        if 'intern_summary' in delta:
+            say_as(
+                agent_name=current_agent_node,
+                text=delta['intern_summary'],
+                enabled=config.USE_VOICE
+            )
+
+    _banner(f'Done — session {session_id}', DIM)
 
 
 def main() -> None:
     args = parse_args()
 
-    # Apply CLI overrides to config (must use config.X so all modules see the change)
-    if args.no_placeholder:
-        config.PLACEHOLDER_MODE = False
     if args.voice or args.elevenlabs:
         config.USE_VOICE = True
     if args.elevenlabs:
         config.USE_ELEVENLABS = True
-        if not config.ELEVENLABS_API_KEY:
-            print("\033[91m[ERROR] --elevenlabs requires ELEVENLABS_API_KEY to be set.\033[0m")
-            print("  export ELEVENLABS_API_KEY=your_key_here")
-            sys.exit(1)
     if args.obs:
         config.USE_OBS = True
         from obs_manager import init_obs_manager
         init_obs_manager()
 
-    print_header()
-
-    use_voice = args.voice or args.elevenlabs or config.USE_VOICE
-    feature_request = _get_feature_request(use_voice)
+    feature_request = _get_feature_request()
     if not feature_request:
-        print("No feature request provided. Exiting.")
+        print('No feature request. Exiting.')
         sys.exit(1)
 
-    session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    session_dir = WORKSPACE_DIR / session_id
-    session_dir.mkdir(parents=True, exist_ok=True)
-    print(f"\n  \033[2mSession workspace: {session_dir}\033[0m\n")
-
-    orchestrator = Orchestrator(
-        feature_request=feature_request,
-        rounds=args.rounds,
-        use_voice=use_voice,
-        workspace_dir=session_dir,
-    )
-
-    orchestrator.run()
-    orchestrator.summon_intern()
-
-    run_feedback_mode(
-        edgeworth_history=orchestrator.edgeworth_history,
-        light_history=orchestrator.light_history,
-        use_voice=use_voice,
-    )
+    run(feature_request, args.rounds)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

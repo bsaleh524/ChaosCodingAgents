@@ -2,7 +2,7 @@
 
 Two AI agents argue over your codebase. One rewrites it. The other rewrites the rewrite. A third agent explains the mess when you get back.
 
-Built for learning multi-agent LLM orchestration — the system intentionally leaves 4 key coordination functions unimplemented so you can build them yourself.
+Built as a LangGraph multi-agent system — a state graph replaces a hand-rolled turn loop, with agent nodes, a routing function, and a stream observer driving terminal output, TTS, and OBS portrait switching.
 
 ---
 
@@ -19,35 +19,30 @@ You speak or type a feature request
 │   │  EDGEWORTH  │ ◄────────────────── │   workspace/    │   │
 │   │  (precise,  │                     │   solution.py   │   │
 │   │  cold)      │ ──── writes code ──►│                 │   │
-│   └──────┬──────┘                     │   (git repo)    │   │
-│          │ critique                   │                 │   │
-│          ▼                            │                 │   │
-│   ┌─────────────┐   reads workspace   │                 │   │
-│   │   SPARKS    │ ◄────────────────── │                 │   │
-│   │  (chaotic,  │                     │                 │   │
-│   │  defensive) │ ──── rewrites ─────►│                 │   │
 │   └──────┬──────┘                     └─────────────────┘   │
 │          │ critique                          │              │
-│          └──────────────── repeat ◄──────────┘              │
+│          ▼                                   │              │
+│   ┌─────────────┐   reads workspace          │              │
+│   │    LIGHT    │ ◄──────────────────────────┘              │
+│   │  (chaotic,  │                                           │
+│   │  defensive) │ ──── rewrites ──────────────┐             │
+│   └──────┬──────┘                             │             │
+│          │ critique                           ▼             │
+│          └──────────────── repeat ◄── workspace/solution.py │
 └─────────────────────────────────────────────────────────────┘
          │
-         │  (N rounds complete, or you press Enter)
+         │  (N rounds complete)
          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    THE INTERN                               │
 │   Reads final codebase. Panics. Summarizes what was         │
 │   actually built vs. what you asked for.                    │
 └─────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   FEEDBACK MODE                             │
-│   You speak (or type) feedback.                             │
-│   Both agents respond in character simultaneously.          │
-│   Agents can react to each other's responses.               │
-│   Press q to exit.                                          │
-└─────────────────────────────────────────────────────────────┘
 ```
+
+This loop is a LangGraph `StateGraph`: `edgeworth` and `light` are nodes, a conditional
+edge (`should_continue`) decides whether to loop back to `edgeworth` or move on to
+`intern`, and `intern` connects to `END`. See `graph.py`.
 
 ### Message flow between agents
 
@@ -67,11 +62,14 @@ Each agent receives a **context package** on their turn — this is the core of 
    Agent reads it, writes new code + critique
          │
          ▼
-   Code → written to workspace/solution.py
+   Code → written to workspace/<session_id>/solution.py
    Critique → passed to next agent's context package
 ```
 
-Each agent also maintains its own **conversation history** — so Edgeworth remembers everything he's written, and Sparks remembers everything she's written, but they don't share the same thread.
+Each agent also maintains its own **conversation history** in LangGraph state
+(`edgeworth_history` / `light_history`, accumulated via the `add_messages` reducer) —
+so Edgeworth remembers everything he's written, and Light remembers everything he's
+written, but they don't share the same thread.
 
 ---
 
@@ -80,7 +78,7 @@ Each agent also maintains its own **conversation history** — so Edgeworth reme
 From round 3 onward, both agents are instructed they may add unrequested functionality:
 
 - **Edgeworth** adds abstraction layers, design patterns, and architecture that wasn't asked for — because he considers the original request beneath proper engineering
-- **Sparks** adds chaotic bonus features mid-rewrite and announces them as obvious improvements
+- **Light** adds chaotic bonus features mid-rewrite and announces them as obvious improvements
 
 The Intern's summary explicitly calls out what you asked for vs. what was actually built.
 
@@ -94,38 +92,26 @@ mamba env create -f environment.yml
 mamba activate chaos-agents
 ```
 
-**2. Set your API key** (only needed when running with `--no-placeholder`)
+**2. Set your API key**
 ```bash
 export ANTHROPIC_API_KEY=your_key_here
 ```
 
 **3. Run**
 ```bash
-python main.py
+python main.py --rounds 2
 ```
 
 **CLI options**
 ```bash
-python main.py --rounds 3          # shorter loop for testing
-python main.py --voice             # enables mic input + Mac TTS via `say`
-python main.py --no-placeholder    # real Anthropic LLM calls
+python main.py --rounds 3          # shorter/longer loop
+python main.py --voice              # per-agent TTS via Mac `say`
+python main.py --voice --elevenlabs  # TTS via ElevenLabs instead
+python main.py --obs                # OBS portrait switching per agent turn
 ```
 
-By default the system runs in **placeholder mode** — no API key needed, canned in-character responses, full git history. Good for testing the infrastructure before wiring in real LLM calls.
-
-### Voice input
-
-When `--voice` is on, the feature request prompt changes:
-
-```
-  Feature request:
-  [Enter = speak | type to skip mic] >
-```
-
-- **Press Enter** → records from your microphone, stops after 1.5 seconds of silence, transcribes with faster-whisper, and uses the result as your feature request
-- **Type anything** → skips the mic entirely and uses what you typed
-
-The same mic + transcription is used in feedback mode when you press `f`.
+Each run creates `workspace/<session_id>/solution.py`, the file both agents read from
+and rewrite each round — printed at startup so you can find it afterward.
 
 ---
 
@@ -134,87 +120,51 @@ The same mic + transcription is used in feedback mode when you press `f`.
 ```
 ChaosCodingAgents/
 │
-├── main.py               Entry point. Parses args, creates session folder,
-│                         runs the loop in a thread, chains Intern + Feedback.
+├── state.py                   CCAState — the graph's shared state schema.
 │
-├── orchestrator.py       Manages the turn loop. Placeholder loop is fully
-│                         implemented. Real LLM loop is a learning TODO.
+├── nodes.py                   edgeworth_node, light_node, intern_node.
 │
-├── agents.py             All three agent definitions:
-│                         - System prompts for Edgeworth, Sparks, and the Intern
-│                         - Placeholder (canned) responses for each
-│                         - Real Anthropic API calls for each
-│                         - Drift directives injected from round 3 onward
+├── graph.py                   Graph wiring: nodes, edges, should_continue routing.
 │
-├── context_builder.py    [TODO] Formats the context package passed between
-│                         agents. The core of multi-agent communication.
+├── main.py                    CLI entry point, initial state, stream observer
+│                               (terminal output, TTS, OBS, file persistence).
 │
-├── context_trimmer.py    [TODO] Trims conversation histories to stay within
-│                         token limits as rounds accumulate.
+├── agents.py                  System prompts for Edgeworth, Light, and the Intern,
+│                               plus their drift directives (round 3+).
 │
-├── feedback.py           Feedback mode UI + [TODO] routing logic that fans
-│                         out Basem's feedback to both agents independently.
+├── context_builder.py         Formats the context package passed between agents.
 │
-├── git_manager.py        Wraps GitPython. Inits the session repo, writes
-│                         solution files, commits after each turn, diffs.
+├── workspace_manager.py       Writes each round's code to workspace/<session>/solution.py.
 │
-├── voice.py              Mac TTS via `say` (per-agent voices), microphone
-│                         recording via sounddevice + webrtcvad, and
-│                         speech-to-text via faster-whisper.
+├── voice.py                   TTS via Mac `say` or ElevenLabs (per-agent voices),
+│                               microphone recording, and speech-to-text.
 │
-├── config.py             All tuneable constants: mode flags, round count,
-│                         model names, workspace path, token budget.
+├── obs_manager.py             OBS WebSocket connection — show/hide agent portraits.
 │
-├── environment.yml       Mamba environment definition (conda-forge + pip).
+├── terminal_ui.py             Terminal colors, banners, and critique-block printing.
 │
-└── workspace/            Created at runtime. Each session gets its own
-    └── 20260421_143022/  timestamped subfolder initialized as a git repo.
-        └── solution.py   The file agents write to and rewrite each round.
+├── config.py                  All tuneable constants: round count, model names,
+│                               workspace path, OBS/voice settings.
+│
+├── environment.yml            Mamba environment definition (conda-forge + pip).
+│
+├── LANGGRAPH_EXERCISE.md      The tutorial this implementation was built from —
+│                               17 guided TODOs walking through LangGraph concepts.
+│
+└── workspace/                 Created at runtime. Each session gets its own
+    └── 20260421_143022/       timestamped subfolder.
+        └── solution.py        The file agents write to and rewrite each round.
 ```
 
 ---
 
-## The 4 Learning Gaps
+## What's Next
 
-The system is intentionally incomplete. These four functions are the glue that makes multi-agent systems work — implementing them in order is the learning arc:
-
-| # | File | Function | What it teaches |
-|---|------|----------|-----------------|
-| 1 | `context_builder.py` | `build_context_package()` | How agents share state — what you pass between agents determines how well they coordinate |
-| 2 | `orchestrator.py` | `_run_real_loop()` | Turn orchestration — tracking whose turn it is, invoking agents, deciding when to stop |
-| 3 | `context_trimmer.py` | `trim_conversation_history()` | Context window management — a real production problem in long-running agentic systems |
-| 4 | `feedback.py` | `route_feedback_to_agents()` | Fan-out routing — one input to multiple independent agents, each with their own context thread |
-
-Find them all at once:
-```bash
-grep -rn "TODO \[LEARNING\]" .
-```
-
-Each TODO block includes: what the function does, why it matters in multi-agent systems, and a concrete implementation hint.
-
-### How the learning gaps are structured
-
-Every TODO function has the full solution sitting beneath it — commented out — with each line annotated:
-
-```python
-# ── Step 1: Flatten the codebase dict into a readable string ─────────────
-# The codebase is {filename: contents}. We want to show every file clearly
-# so the agent can see the full picture, not just one file.
-#
-# codebase_str = "\n\n".join(
-#     f"=== {fname} ===\n{contents}"       # label + file contents
-#     for fname, contents in codebase.items()  # iterate every file in the workspace
-# )
-```
-
-The workflow for each TODO:
-1. Read the TODO comment — understand what the function needs to do and why
-2. Read the commented-out solution — understand each line before you touch it
-3. Uncomment the solution (or write your own version)
-4. Delete the `pass` at the bottom
-5. Run with `--no-placeholder` and see the system change behaviour
-
-Implementing them in order (1 → 2 → 3 → 4) gives you incremental progress — each one makes the system noticeably smarter.
+**Human-in-the-Loop feedback mode** — after the Intern's summary, a follow-up mode
+where you can talk back to both agents and they respond in character — isn't ported to
+LangGraph yet. It's a natural next step using `interrupt_before` + `update_state` to
+pause the graph before an agent's turn, inspect/modify state, and resume. See the
+"What's next" section of `LANGGRAPH_EXERCISE.md` for the approach.
 
 ---
 
@@ -222,10 +172,12 @@ Implementing them in order (1 → 2 → 3 → 4) gives you incremental progress 
 
 | Tool | Used for |
 |------|----------|
-| [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) | LLM calls — `claude-sonnet-4-6` for agents, `claude-haiku-4-5` for Intern |
-| [GitPython](https://gitpython.readthedocs.io) | Committing each rewrite so the full history is inspectable |
-| `say` (macOS) | Per-agent TTS voices — Alex for Edgeworth, Zoe for Sparks |
-| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Speech-to-text for voice feedback mode |
+| [LangGraph](https://langchain-ai.github.io/langgraph/) | State graph, agent nodes, conditional routing, conversation-history reducers |
+| [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) / [langchain-anthropic](https://python.langchain.com/docs/integrations/chat/anthropic/) | LLM calls — `claude-sonnet-4-6` for agents, `claude-haiku-4-5` for the Intern |
+| `say` (macOS) | Per-agent TTS voices |
+| [ElevenLabs](https://elevenlabs.io) | Alternative TTS backend (`--elevenlabs`) |
+| [OBS WebSocket](https://github.com/obsproject/obs-websocket) | Portrait switching per agent turn (`--obs`) |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Speech-to-text for voice input |
 | [sounddevice](https://python-sounddevice.readthedocs.io) + [webrtcvad](https://github.com/wiseman/py-webrtcvad) | Microphone recording with voice activity detection |
 
 Extra personal note: Use Audio Move OBS plugin or Scale To Sound OBS plugin for AIs speaking.
@@ -233,4 +185,4 @@ Edgeworth with phoenix wright music. Also Light Yagami with the Death Note music
 
 # edgeworth: Mac is Jamie(Premium) or EL: Micheal C Vincement
 # Light yagamia: Mac is  Tim(Enhanced) or Edward (loud, confident, cocky)
-# "I want a drawn banana in ascii. When I run the file, it merely prints it to the console."
+# intern: Mac is Zoe (Enhanced)

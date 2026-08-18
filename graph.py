@@ -9,8 +9,8 @@ all collapse into graph edges here.
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
-from .state import CCAState
-from .nodes import edgeworth_node, light_node, intern_node
+from state import CCAState
+from nodes import edgeworth_node, light_node, intern_node
 
 
 # ── Routing function ───────────────────────────────────────────────────────────
