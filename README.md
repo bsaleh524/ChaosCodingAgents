@@ -1,5 +1,7 @@
 # Chaos Coding Agents
 
+![Two agents arguing over a floating cube of code while a small intern panics beside them](assets/readme_cover.jpg)
+
 Two AI agents argue over your codebase. One rewrites it. The other rewrites the rewrite. A third agent explains the mess when you get back.
 
 Built as a LangGraph multi-agent system — a state graph replaces a hand-rolled turn loop, with agent nodes, a routing function, and a stream observer driving terminal output, TTS, and OBS portrait switching.
