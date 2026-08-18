@@ -20,3 +20,4 @@ dependencies:
       - faster-whisper>=1.0.0   # no conda-forge build
       - obs-websocket-py==1.0 # OBS WebSocket integration
       - webrtcvad-wheels
+      - grandalf                # for LangGraph's draw_ascii() visualization

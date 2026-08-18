@@ -19,7 +19,7 @@ ELEVENLABS_VOICES = {
 SAY_VOICES = {
     "EDGEWORTH": "Jamie",
     "LIGHT":     "Tim",
-    "INTERN":    "Samantha",
+    "INTERN":    "Zoe (Enhanced)",
 }
 
 

@@ -28,7 +28,7 @@ def should_continue(state: CCAState) -> str:
     #
     # Ask yourself: what value in state tells you whether the loop is done?
     #
-    ___
+    return "intern" if state['round'] > state['max_rounds'] else "edgeworth"
 
 
 # ── Graph builder ──────────────────────────────────────────────────────────────
@@ -40,22 +40,22 @@ def build_graph():
     # Register all three nodes with the graph.
     # Syntax: graph.add_node('node_name', function)
     #
-    ___
-    ___
-    ___
+    graph.add_node('edgeworth', edgeworth_node)
+    graph.add_node('light', light_node)
+    graph.add_node('intern', intern_node)
 
     # TODO 12 ─────────────────────────────────────────────────────────────────
     # Set the entry point — where execution starts when invoke() is called.
     # Which agent goes first?
     #
-    ___
+    graph.set_entry_point('edgeworth')
 
     # TODO 13 ─────────────────────────────────────────────────────────────────
     # Add the unconditional edge between the two main agents.
     # This edge always fires — no routing needed.
     # Syntax: graph.add_edge('from_node', 'to_node')
     #
-    ___
+    graph.add_edge('edgeworth', 'light')
 
     # TODO 14 ─────────────────────────────────────────────────────────────────
     # Add the conditional edge FROM light.
@@ -72,14 +72,18 @@ def build_graph():
     # What are the two possible destinations from light?
     # Make sure your return values in should_continue match the keys here.
     #
-    ___
+    graph.add_conditional_edges(
+        'light',
+        should_continue,
+        {'edgeworth': 'edgeworth', 'intern': 'intern'}
+    )
 
     # TODO 15 ─────────────────────────────────────────────────────────────────
     # Connect intern to the end of the graph.
     # END is a sentinel value imported from langgraph.graph.
     # What edge do you add to say "after intern, stop"?
     #
-    ___
+    graph.add_edge('intern', END)
 
     checkpointer = MemorySaver()
     return graph.compile(checkpointer=checkpointer)

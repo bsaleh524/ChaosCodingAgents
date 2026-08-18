@@ -46,7 +46,7 @@ def edgeworth_node(state: CCAState) -> dict:
     # This is a message from the "user" (the orchestrator giving context to the agent).
     # Hint: you imported message types at the top of this file.
     #
-    new_user_msg = ___
+    new_user_msg = HumanMessage(content=pkg)
 
     # TODO 5 ──────────────────────────────────────────────────────────────────
     # Build the full message list to pass to the LLM.
@@ -57,7 +57,8 @@ def edgeworth_node(state: CCAState) -> dict:
     #
     # Note: existing history comes from state — it's already a list of messages.
     #
-    all_msgs = ___
+    all_msgs = [SystemMessage(content=system_text)] +\
+        state.get('edgeworth_history', []) + [new_user_msg]
 
     model = ChatAnthropic(model=AGENT_MODEL, max_tokens=8192)
     response = model.invoke(all_msgs)
@@ -74,7 +75,9 @@ def edgeworth_node(state: CCAState) -> dict:
     #     (Return the new messages — the reducer handles the append.)
     #
     return {
-        ___
+        'code': code,
+        'last_critique': critique,
+        'edgeworth_history': [new_user_msg, response]
     }
 
 
@@ -97,8 +100,9 @@ def light_node(state: CCAState) -> dict:
     # Build new_user_msg and all_msgs for Light's LLM call.
     # Note: use state['light_history'], not edgeworth_history.
     #
-    new_user_msg = ___
-    all_msgs = ___
+    new_user_msg = HumanMessage(content=pkg)
+    all_msgs = [SystemMessage(content=system_text)] +\
+        state.get('light_history', []) + [new_user_msg]
 
     model = ChatAnthropic(model=AGENT_MODEL, max_tokens=8192)
     response = model.invoke(all_msgs)
@@ -112,7 +116,10 @@ def light_node(state: CCAState) -> dict:
     # and who is responsible for incrementing it?
     #
     return {
-        ___
+        'code': code,
+        'last_critique': critique,
+        'light_history': [new_user_msg, response],
+        'round': r+1
     }
 
 
@@ -136,4 +143,4 @@ def intern_node(state: CCAState) -> dict:
     # The Intern doesn't produce code or a critique.
     # Returning nothing at all is a valid answer — what does that look like?
     #
-    return ___
+    return {'intern_summary': response.content}

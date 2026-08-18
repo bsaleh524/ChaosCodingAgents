@@ -16,6 +16,7 @@ from datetime import datetime
 import config
 from orchestrator import _critique_block, _banner, BOLD, GREEN, DIM
 from voice import say_as
+from workspace_manager import WorkspaceManager
 
 from .graph import cca_app
 
@@ -38,6 +39,10 @@ def run(feature_request: str, rounds: int) -> None:
     session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
     graph_config = {'configurable': {'thread_id': session_id}}
 
+    session_dir = config.WORKSPACE_DIR / session_id
+    ws = WorkspaceManager(session_dir)
+    print(f'\n  \033[2mSession workspace: {session_dir}\033[0m\n')
+
     # TODO 16 ─────────────────────────────────────────────────────────────────
     # Build the initial state dict.
     #
@@ -50,7 +55,14 @@ def run(feature_request: str, rounds: int) -> None:
     #   - What value should the history fields start with? (They're lists.)
     #
     initial_state = {
-        ___
+        'feature_request': feature_request,
+        'max_rounds': rounds,
+        'round': 1,
+        'code': '',
+        'last_critique': None,
+        'intern_summary': None,
+        'edgeworth_history': [],
+        'light_history': [],
     }
 
     _banner(f'CHAOS CODING AGENTS  |  LangGraph  |  {rounds} round(s)', BOLD + GREEN)
@@ -73,7 +85,28 @@ def run(feature_request: str, rounds: int) -> None:
     # exactly one key per chunk.
     #
     for chunk in cca_app.stream(initial_state, config=graph_config, stream_mode='updates'):
-        ___
+        current_agent_node = list(chunk.keys())[0]
+        delta = chunk[current_agent_node] or {}
+
+        if 'last_critique' in delta:
+            agent_critique = delta['last_critique']
+            _critique_block(current_agent_node.upper(), agent_critique)
+            say_as(
+                agent_name=current_agent_node,
+                text=agent_critique,
+                enabled=config.USE_VOICE
+            )
+        if 'code' in delta:
+            agent_code = delta['code']
+            print(f"  [{current_agent_node.upper()}] wrote {len(agent_code)} chars")
+            ws.write_solution(agent_code, config.SOLUTION_FILE)
+
+        if 'intern_summary' in delta:
+            say_as(
+                agent_name=current_agent_node,
+                text=delta['intern_summary'],
+                enabled=config.USE_VOICE
+            )
 
     _banner(f'Done — session {session_id}', DIM)
 

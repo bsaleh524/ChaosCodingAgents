@@ -13,7 +13,7 @@ from langchain_core.messages import BaseMessage
 # Hint: it lives in langgraph.graph.message and makes lists accumulate
 #       (append) rather than replace on each node update.
 #
-# from ___ import ___
+from langgraph.graph.message import add_messages
 
 
 class CCAState(TypedDict):
@@ -30,6 +30,7 @@ class CCAState(TypedDict):
     # ── Shared workspace ──────────────────────────────────────────────────────
     code: str                      # the latest code version
     last_critique: Optional[str]   # what the previous agent said
+    intern_summary: Optional[str]  # the Intern's closing summary
 
     # ── Per-agent conversation histories ──────────────────────────────────────
     # These need to ACCUMULATE across rounds, not be replaced.
@@ -42,9 +43,9 @@ class CCAState(TypedDict):
     # appended (not replaced) when a node returns this key.
     # Hint: use Annotated[___, ___] with your import from TODO 1.
     #
-    edgeworth_history: ___
+    edgeworth_history: Annotated[list[BaseMessage], add_messages]
 
     # TODO 3 ──────────────────────────────────────────────────────────────────
     # Same thing for light_history.
     #
-    light_history: ___
+    light_history: Annotated[list[BaseMessage], add_messages]
